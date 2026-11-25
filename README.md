@@ -36,7 +36,7 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 
 | Key | Action |
 |---|---|
-| `F7` | Go on / off duty. While on duty you can't get a wanted level the game's own police are switched off, and story phone calls, texts and random events wait until you go off duty. |
+| `F7` | Go on / off duty. While on duty you can't get a wanted level, the game's own police are switched off, and story phone calls, texts and random events wait until you go off duty. |
 | `Y` / `N` | Accept / decline the call dispatch is offering. |
 | `E` | Deal with the suspect (on foot, standing next to them). |
 | `End` | Call off the current callout. |
