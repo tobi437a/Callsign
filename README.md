@@ -46,7 +46,14 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 
 While on duty, dispatch offers a call every minute or two. Accept it, follow the yellow route,
 and find the suspect: they might cooperate, run, or fight. Runners give up when you catch them on
-foot; fighters give up once stunned or hurt.
+foot; fighters give up once stunned or hurt. Some calls have several suspects, each with a mind of
+their own.
+
+Some suspects are in a vehicle (stolen cars, drunk drivers, shootings from a car). Dispatch tracks
+the vehicle for you. Get behind it and turn on your emergency lights: a cooperative driver pulls
+over and waits for you to walk up; anyone else floors it. When a fleeing car is wrecked or comes
+to a stop, everyone inside bails out and runs, fights or gives up. Armed passengers may shoot at
+you during the chase.
 
 Hold `E` to stop a suspect, then press `E` to deal with them: ask for ID, question them, run their
 name over the radio, breathalyze them, take a drug swab (the kit is in your car, so park nearby),
@@ -185,7 +192,12 @@ api.Callouts.AddLocation(new CalloutLocation(
 
 - Ids must be unique across all plugins: start them with your plugin's name.
 - Built-in tags: locations `store`, `public`, `street`, `city`, `county`; suspects `rowdy`,
-  `armed`; outcomes `calm`, `runs`, `violent`.
+  `armed`, `robber`, and in vehicles `thief`, `dui`, `gang`; outcomes `calm`, `runs`, `violent`.
+- Vehicle calls (since 0.4): set `InVehicle = true` on the situation and give suspects
+  `Vehicles = new[] { "sultan" }`. A vehicle situation only uses suspects with vehicles, the others
+  only suspects on foot.
+- Several suspects (since 0.4): set `MinSuspects` / `MaxSuspects` (up to 4) on the situation. Each
+  suspect rolls their own outcome. `{count}` in the dispatch text becomes the number, as a word.
 - Your parts are removed when your plugin unloads.
 
 ### Compatibility

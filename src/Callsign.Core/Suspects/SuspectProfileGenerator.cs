@@ -134,10 +134,15 @@ namespace Callsign.Core.Suspects
             _random = random;
         }
 
-        /// <summary>A line for <paramref name="topic"/>, with <c>{name}</c> filled in. Empty if there are none.</summary>
-        public string Say(DialogueTopic topic, SuspectProfile suspect)
+        /// <summary>
+        /// A line for <paramref name="topic"/> that fits where the suspect was stopped, with <c>{name}</c>
+        /// filled in. Empty if there are none.
+        /// </summary>
+        public string Say(DialogueTopic topic, SuspectProfile suspect, DialogueContext context = DialogueContext.OnFoot)
         {
-            var lines = _content.Lines.Where(l => l.Topic == topic).ToList();
+            var lines = _content.Lines
+                .Where(l => l.Topic == topic && (l.Context == DialogueContext.Any || l.Context == context))
+                .ToList();
             var forTraits = lines.Where(l => l.Trait != SuspectTraits.None && suspect.Has(l.Trait)).ToList();
             var pool = forTraits.Count > 0 ? forTraits : lines.Where(l => l.Trait == SuspectTraits.None).ToList();
             if (pool.Count == 0) return "";

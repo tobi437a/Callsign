@@ -14,7 +14,7 @@ namespace Callsign.API.Callouts
         /// <summary>Creates a situation.</summary>
         /// <param name="id">Unique id, prefixed with your plugin's name.</param>
         /// <param name="title">Short call title, e.g. "Noise complaint".</param>
-        /// <param name="dispatch">Dispatch text. <c>{location}</c> and <c>{suspect}</c> are filled in.</param>
+        /// <param name="dispatch">Dispatch text. <c>{location}</c>, <c>{suspect}</c> and <c>{count}</c> (number of suspects, as a word) are filled in.</param>
         /// <param name="locationTags">A location fits if it has any of these tags. Null or empty = any location.</param>
         /// <param name="suspectTags">Same for suspects.</param>
         /// <param name="outcomeTags">Same for outcomes.</param>
@@ -46,6 +46,19 @@ namespace Callsign.API.Callouts
         public IReadOnlyList<string> OutcomeTags { get; }
         /// <summary>Relative chance of being picked.</summary>
         public double Weight { get; }
+
+        /// <summary>
+        /// The suspects are in a vehicle. Such a situation only uses suspects that have
+        /// <see cref="CalloutSuspect.Vehicles"/>, and the others only use suspects on foot. Default false.
+        /// Since API 0.4.
+        /// </summary>
+        public bool InVehicle { get; set; }
+
+        /// <summary>Fewest suspects (1 to 4, default 1). Each one rolls their own outcome. Since API 0.4.</summary>
+        public int MinSuspects { get; set; } = 1;
+
+        /// <summary>Most suspects (<see cref="MinSuspects"/> to 4). 0 (default) = same as <see cref="MinSuspects"/>. Since API 0.4.</summary>
+        public int MaxSuspects { get; set; }
     }
 
     /// <summary>A place where incidents can happen.</summary>
@@ -107,6 +120,18 @@ namespace Callsign.API.Callouts
         public IReadOnlyList<string> Models { get; }
         /// <summary>Weapon they carry, or null.</summary>
         public string? Weapon { get; }
+
+        /// <summary>
+        /// Vehicle model names they drive, e.g. "sultan" (one is picked per call). Empty (default) = on foot.
+        /// Suspects with vehicles only appear in situations with <see cref="CalloutSituation.InVehicle"/>.
+        /// Since API 0.4.
+        /// </summary>
+        public IReadOnlyList<string> Vehicles
+        {
+            get => _vehicles;
+            set => _vehicles = TagList.Copy(value);
+        }
+        IReadOnlyList<string> _vehicles = Array.Empty<string>();
         /// <summary>Labels situations filter on.</summary>
         public IReadOnlyList<string> Tags { get; }
         /// <summary>Relative chance of being picked.</summary>

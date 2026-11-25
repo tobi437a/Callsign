@@ -24,6 +24,7 @@ sealed class FakeWorld : IWorld
     public bool PlayerOnFoot { get; set; } = true;
     public bool PlayerInVehicle { get; set; }
     public bool PlayerDead { get; set; }
+    public bool PlayerLightsOn { get; set; }
     public bool HasStreets { get; set; }
     public Position? PlayerVehicle { get; set; }
 
@@ -57,11 +58,21 @@ sealed class FakePed(Position at) : IPed
     public bool WeaponInHand { get; private set; }
     public void GiveWeapon(string weapon, bool equip) { Weapon = weapon; WeaponInHand = equip; }
     public void RemoveWeapons() { Weapon = null; WeaponInHand = false; }
-    public void Wander() => Order = "wander";
-    public void FacePlayer() => Order = "face";
-    public void HandsUp() => Order = "handsup";
-    public void FleeFromPlayer() => Order = "flee";
-    public void FightPlayer() => Order = "fight";
+    public void Wander() => OnFoot("wander");
+    public void FacePlayer() => OnFoot("face");
+    public void HandsUp() => OnFoot("handsup");
+    public void FleeFromPlayer() => OnFoot("flee");
+    public void FightPlayer() => OnFoot("fight");
+    void OnFoot(string order) { Order = order; InVehicle = false; }   // on-foot orders get them out first
+
+    public bool InVehicle { get; set; }
+    public bool PlayerAimingAt { get; set; }
+    public int Seat { get; private set; } = -1;
+    public void WarpInto(IVehicle vehicle, int seat) { InVehicle = true; Seat = seat; }
+    public void DriveAround() { if (Seat == 0 && InVehicle) Order = "drive"; }
+    public void DriveAway() { if (Seat == 0 && InVehicle) Order = "driveaway"; }
+    public void PullOver() { if (Seat == 0 && InVehicle) Order = "pullover"; }
+    public void ShootFromVehicle() { if (InVehicle) Order = "driveby"; }
 
     public bool IsSubdued { get; set; }
     public int CuffLoadTicks = 1;   // first call "streams the animation"
@@ -77,7 +88,7 @@ sealed class FakePed(Position at) : IPed
         return true;
     }
 
-    public void FollowPlayer() => Order = "follow";
+    public void FollowPlayer() => OnFoot("follow");
 
     public bool EnterPlayerVehicle(bool warp)
     {
@@ -93,6 +104,7 @@ sealed class FakePeds : IPedFactory
 {
     public int LoadTicks = 1;   // first call "streams the model"
     public FakePed? Last;
+    public readonly List<FakePed> All = [];
 
     public bool TrySpawn(EntityScope scope, string model, Position at, float heading, out IPed? ped)
     {
@@ -100,6 +112,33 @@ sealed class FakePeds : IPedFactory
         if (model == "bad_model") throw new ArgumentException("bad model");
         if (LoadTicks-- > 0) return false;
         ped = Last = scope.Track(new FakePed(at));
+        All.Add(Last);
+        return true;
+    }
+}
+
+sealed class FakeVehicle(Position at) : IVehicle
+{
+    public bool Exists { get; set; } = true;
+    public Position Position { get; set; } = at;
+    public float Speed { get; set; } = 15;
+    public bool IsWrecked { get; set; }
+    public int BurstTyres { get; set; }
+    public float EngineHealth { get; set; } = 1;
+    public ReleaseMode? Released { get; private set; }
+    public void Release(ReleaseMode mode) => Released = mode;
+}
+
+sealed class FakeVehicles : IVehicleFactory
+{
+    public int LoadTicks = 1;
+    public FakeVehicle? Last;
+
+    public bool TrySpawn(EntityScope scope, string model, Position at, float heading, out IVehicle? vehicle)
+    {
+        vehicle = null;
+        if (LoadTicks-- > 0) return false;
+        vehicle = Last = scope.Track(new FakeVehicle(at));
         return true;
     }
 }
@@ -153,6 +192,7 @@ public class CalloutServiceTests
     readonly FakeClock _clock = new();
     readonly FakeWorld _world = new();
     readonly FakePeds _peds = new();
+    readonly FakeVehicles _vehicles = new();
     readonly FakeBlips _blips = new();
     readonly FakeNotifier _notifier = new();
     readonly NullLog _log = new();
@@ -164,6 +204,7 @@ public class CalloutServiceTests
     readonly CalloutService _service;
     readonly CalloutSettings _settings = new();
     readonly FakeMenuView _menu = new();
+    IDisposable _footCall;
 
     public CalloutServiceTests()
     {
@@ -173,7 +214,7 @@ public class CalloutServiceTests
         _bus.Subscribe<CalloutAccepted>(_events.Add);
         _bus.Subscribe<CalloutEnded>(_events.Add);
 
-        _parts.Situations.Add(new SituationPart("sit", "Test call", "{suspect} at {location}", [], [], [], []));
+        _footCall = _parts.Situations.Add(new SituationPart("sit", "Test call", "{suspect} at {location}", [], [], [], []));
         _parts.Locations.Add(new LocationPart("loc", "Test St", Scene, []));
         _parts.Suspects.Add(new SuspectPart("sus", "man", ["model"], "WEAPON_KNIFE", []));
 
@@ -185,7 +226,7 @@ public class CalloutServiceTests
         var content = new SuspectContent();
         var interaction = new InteractionServices(_world, _notifier, _menu, _clock, random, new Dialogue(content, random),
             new InteractionSettings());
-        var services = new CalloutSceneServices(_scopes, _peds, _blips, _world, _notifier, _log, _settings,
+        var services = new CalloutSceneServices(_scopes, _peds, _vehicles, _blips, _world, _notifier, _clock, random, _log, _settings,
             new SuspectProfileGenerator(content, random, noTraits), interaction, custody);
         _service = new CalloutService(new IncidentGenerator(_parts, random), _duty, _bus, _clock, random, services);
     }
@@ -236,6 +277,43 @@ public class CalloutServiceTests
     }
 
     CalloutEnded Ended() => Assert.IsType<CalloutEnded>(_events[^1]);
+
+    /// <summary>Replaces the test call with one of <paramref name="count"/> suspects, in a vehicle or on foot.</summary>
+    void UseCall(SuspectBehaviour behaviour, int count = 1, bool vehicle = false)
+    {
+        _footCall.Dispose();
+        _parts.Situations.Add(new SituationPart("multi", "Test call", "{suspect} at {location}", [], [], [], [])
+            { InVehicle = vehicle, MinSuspects = count, MaxSuspects = count });
+        if (vehicle) _parts.Suspects.Add(new SuspectPart("car", "Karin Sultan", ["model"], "WEAPON_PISTOL", []) { Vehicles = ["sultan"] });
+        UseOutcome(behaviour);
+    }
+
+    /// <summary>Accepts the call and drives close enough for everyone to spawn (not yet close enough to be noticed).</summary>
+    List<FakePed> StartAndSpawn(int count)
+    {
+        _duty.SetOnDuty(true);
+        Tick();
+        Assert.True(_service.RequestNow());
+        Assert.True(_service.Accept());
+        _world.PlayerPosition = new Position(Scene.X - 100, 0, 0);
+        for (int i = 0; i < 10 && _peds.All.Count < count; i++) Tick();
+        Assert.Equal(count, _peds.All.Count);
+        return _peds.All;
+    }
+
+    void PlayerInCarAt(Position at, float behind)
+    {
+        _world.PlayerOnFoot = false;
+        _world.PlayerInVehicle = true;
+        _world.PlayerPosition = at with { X = at.X - behind };
+    }
+
+    void PlayerOnFootAt(Position at, float away)
+    {
+        _world.PlayerOnFoot = true;
+        _world.PlayerInVehicle = false;
+        _world.PlayerPosition = at with { X = at.X - away };
+    }
 
     [Fact]
     public void NoOffersWhileOffDuty()
@@ -481,6 +559,156 @@ public class CalloutServiceTests
         Assert.Equal(0, _scopes.OpenCount);
     }
 
+    [Fact]
+    public void CalmDriverPullsOverForLightsThenIsDealtWithOnFoot()
+    {
+        UseCall(SuspectBehaviour.Comply, vehicle: true);
+        FakePed driver = StartAndSpawn(1)[0];
+        FakeVehicle car = _vehicles.Last!;
+        Assert.True(driver.InVehicle);
+        Assert.Equal(0, driver.Seat);
+        Assert.Equal("drive", driver.Order);
+        Assert.False(driver.WeaponInHand);
+
+        PlayerInCarAt(car.Position, 20);
+        Tick();
+        Assert.Equal(CalloutScene.PullOverHelp, _notifier.HelpShown);
+        Assert.Equal("drive", driver.Order);   // no lights, no reaction
+
+        _world.PlayerLightsOn = true;
+        Tick();
+        Assert.Equal("pullover", driver.Order);
+        Tick();
+        Assert.Equal("pullover", driver.Order);   // still rolling
+
+        car.Speed = 0;
+        Tick();
+        Assert.True(driver.InVehicle);   // waits in the car for the officer
+
+        PlayerOnFootAt(driver.Position, 2);
+        OpenMenu(driver);
+        Assert.True(driver.InVehicle);   // talks through the window
+        Assert.False(_menu.Last!.Items.Single(i => i.Id == SuspectInteraction.Search).Enabled);
+        Choose(SuspectInteraction.StepOut);
+        Assert.Equal("face", driver.Order);
+        Assert.False(driver.InVehicle);
+        Choose(SuspectInteraction.LetGo);
+
+        Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
+        Assert.Equal(ReleaseMode.Dismiss, car.Released);
+        Assert.Equal(0, _scopes.OpenCount);
+    }
+
+    [Fact]
+    public void FleeingDriverBailsOutOnceTheCarStopsAndCanBeCaught()
+    {
+        UseCall(SuspectBehaviour.Flee, vehicle: true);
+        FakePed driver = StartAndSpawn(1)[0];
+        FakeVehicle car = _vehicles.Last!;
+
+        PlayerInCarAt(car.Position, 30);
+        Tick();
+        Assert.Equal("driveaway", driver.Order);   // bolts without waiting for lights
+
+        car.Speed = 0;
+        Tick();
+        Assert.Equal("driveaway", driver.Order);   // a moment stuck in traffic is not the end
+        Advance(_settings.BailAfterStoppedMs);
+        Assert.Equal("flee", driver.Order);
+        Assert.False(driver.InVehicle);
+
+        PlayerOnFootAt(driver.Position, 1);
+        Tick();
+        Assert.Equal("handsup", driver.Order);
+    }
+
+    [Fact]
+    public void FleeingDriverWearsDownUnderPressureAndStops()
+    {
+        UseCall(SuspectBehaviour.Flee, vehicle: true);
+        FakePed driver = StartAndSpawn(1)[0];
+        FakeVehicle car = _vehicles.Last!;
+        PlayerInCarAt(car.Position, 20);
+        Tick();
+        Assert.Equal("driveaway", driver.Order);
+
+        // All four tyres shot out, engine smoking, a gun on them: even the most determined driver breaks.
+        car.BurstTyres = 4;
+        car.EngineHealth = 0.1f;
+        driver.PlayerAimingAt = true;
+        for (int i = 0; i < 60 && driver.Order == "driveaway"; i++) Advance(1000);
+        Assert.Equal("pullover", driver.Order);
+
+        car.Speed = 1;
+        Tick();
+        Assert.False(driver.InVehicle);
+        Assert.Contains(driver.Order, new[] { "handsup", "flee" });   // gave up, or bailed and ran
+    }
+
+    [Fact]
+    public void PursuitEndsWhenTheCarGetsAway()
+    {
+        UseCall(SuspectBehaviour.Flee, vehicle: true);
+        StartAndSpawn(1);
+        FakeVehicle car = _vehicles.Last!;
+        PlayerInCarAt(car.Position, 30);
+        Tick();
+
+        car.Position = car.Position with { X = car.Position.X + _settings.VehicleEscapeDistance + 50 };
+        _peds.All[0].Position = car.Position;
+        Tick();
+
+        Assert.Equal(CalloutEndReason.SuspectEscaped, Ended().Reason);
+    }
+
+    [Fact]
+    public void ArmedPassengersShootFromTheCarAndFightWhenItIsWrecked()
+    {
+        UseCall(SuspectBehaviour.Fight, count: 2, vehicle: true);
+        List<FakePed> suspects = StartAndSpawn(2);
+        FakeVehicle car = _vehicles.Last!;
+        Assert.Equal(1, suspects[1].Seat);
+
+        PlayerInCarAt(car.Position, 30);
+        Tick();
+        Assert.Equal("driveaway", suspects[0].Order);
+        Assert.Equal("driveby", suspects[1].Order);
+
+        car.IsWrecked = true;
+        Tick();
+        Assert.All(suspects, x => Assert.Equal("fight", x.Order));
+
+        suspects[0].IsDead = true;
+        Tick();
+        Assert.Equal(CalloutService.Phase.Active, _service.Current);   // one still fighting
+        suspects[1].IsDead = true;
+        Tick();
+        Assert.Equal(CalloutEndReason.SuspectDied, Ended().Reason);
+    }
+
+    [Fact]
+    public void CallWithSeveralSuspectsEndsOnceEveryoneIsAccountedFor()
+    {
+        UseCall(SuspectBehaviour.Comply, count: 2);
+        List<FakePed> suspects = StartAndSpawn(2);
+        Assert.All(suspects, x => Assert.Equal("wander", x.Order));
+        Assert.NotEqual(suspects[0].Position, suspects[1].Position);
+
+        PlayerOnFootAt(suspects[0].Position, 2);
+        Tick();   // they notice the officer
+        OpenMenu(suspects[0]);
+        Choose(SuspectInteraction.LetGo);
+        Assert.Equal(CalloutService.Phase.Active, _service.Current);
+        Assert.Contains(_notifier.Messages, m => m.Contains("let go"));
+
+        suspects[1].IsDead = true;
+        Tick();
+        CalloutEnded ended = Ended();
+        Assert.Equal(CalloutEndReason.Resolved, ended.Reason);   // someone was dealt with: not "suspect died"
+        Assert.Contains("Code 4", _notifier.Messages[^1]);
+        Assert.Equal(0, _scopes.OpenCount);
+    }
+
     static void Assume(bool condition) => Assert.True(condition, "test setup: seed did not pick the expected part");
 }
 
@@ -496,9 +724,11 @@ public class BuiltInContentTests
 
         Assert.Empty(log.Problems);
         Assert.True(added > 0);
+        // At runtime a street near the player is always a candidate too.
+        var street = new LocationPart("street", "Some St", default, ["street", "public"]);
         foreach (var s in parts.Situations.All)
         {
-            Assert.Contains(parts.Locations.All, s.Fits);
+            Assert.Contains(parts.Locations.All.Append(street), s.Fits);
             Assert.Contains(parts.Suspects.All, s.Fits);
             Assert.Contains(parts.Outcomes.All, s.Fits);
         }

@@ -20,10 +20,27 @@ namespace Callsign.Core.Suspects
         HandsId,
         /// <summary>Asked for ID and has none. <c>{name}</c> is the name they give.</summary>
         NoId,
+        /// <summary>Told to step out of their vehicle.</summary>
+        StepOut,
     }
 
-    /// <summary>A line of dialogue. <paramref name="Trait"/> = None means anyone may say it.</summary>
-    public sealed record DialogueLine(DialogueTopic Topic, SuspectTraits Trait, string Text);
+    /// <summary>Where the suspect was when the officer stopped them.</summary>
+    public enum DialogueContext
+    {
+        /// <summary>A line anyone may say.</summary>
+        Any,
+        /// <summary>Stopped on foot.</summary>
+        OnFoot,
+        /// <summary>Stopped at the wheel (or in a vehicle).</summary>
+        InVehicle,
+    }
+
+    /// <summary>
+    /// A line of dialogue. <paramref name="Trait"/> = None means anyone may say it;
+    /// <paramref name="Context"/> = Any means wherever they were stopped.
+    /// </summary>
+    public sealed record DialogueLine(DialogueTopic Topic, SuspectTraits Trait, string Text,
+        DialogueContext Context = DialogueContext.Any);
 
     /// <summary>A weapon a suspect can hide: game name and how a search describes it.</summary>
     public sealed record HiddenWeapon(string Weapon, string Name);
@@ -114,15 +131,28 @@ namespace Callsign.Core.Suspects
             foreach (var l in x.Lines)
             {
                 SuspectTraits trait = SuspectTraits.None;
+                DialogueContext context = DialogueContext.Any;
                 string text = (l.Text ?? "").Trim();
                 if (!Enum.TryParse(l.Topic, true, out DialogueTopic topic) || !Enum.IsDefined(typeof(DialogueTopic), topic))
                     log.Warn(sourceName + ": skipped line with unknown topic '" + l.Topic + "'");
                 else if (!string.IsNullOrWhiteSpace(l.Trait) && !Enum.TryParse(l.Trait, true, out trait))
                     log.Warn(sourceName + ": skipped line with unknown trait '" + l.Trait + "'");
+                else if (!string.IsNullOrWhiteSpace(l.Context) && !TryParseContext(l.Context!, out context))
+                    log.Warn(sourceName + ": skipped line with unknown context '" + l.Context + "' (use foot or vehicle)");
                 else if (text.Length == 0)
                     log.Warn(sourceName + ": skipped empty " + topic + " line");
                 else
-                    content.Lines.Add(new DialogueLine(topic, trait, text));
+                    content.Lines.Add(new DialogueLine(topic, trait, text, context));
+            }
+        }
+
+        static bool TryParseContext(string value, out DialogueContext context)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "foot": context = DialogueContext.OnFoot; return true;
+                case "vehicle": context = DialogueContext.InVehicle; return true;
+                default: context = DialogueContext.Any; return false;
             }
         }
 
@@ -154,6 +184,7 @@ namespace Callsign.Core.Suspects
     {
         [XmlAttribute("topic")] public string? Topic { get; set; }
         [XmlAttribute("trait")] public string? Trait { get; set; }
+        [XmlAttribute("context")] public string? Context { get; set; }
         [XmlText] public string? Text { get; set; }
     }
 }

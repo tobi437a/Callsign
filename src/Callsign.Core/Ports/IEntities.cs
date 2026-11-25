@@ -19,6 +19,7 @@ namespace Callsign.Core.Ports
         void RemoveWeapons();
 
         // Behaviour orders. Each replaces whatever the ped was doing; all do nothing once the ped is gone.
+        // The on-foot orders (up to FightPlayer, and FollowPlayer) make a ped in a vehicle get out first.
 
         /// <summary>Walks around the area like a normal pedestrian.</summary>
         void Wander();
@@ -37,6 +38,29 @@ namespace Callsign.Core.Ports
 
         /// <summary>Stunned, or hurt enough that they stop fighting or running.</summary>
         bool IsSubdued { get; }
+
+        // Vehicles. The driving orders do nothing unless the ped is driving.
+
+        /// <summary>The player is aiming a weapon at this ped, or at the vehicle they are in.</summary>
+        bool PlayerAimingAt { get; }
+
+        /// <summary>Sitting in a vehicle (any vehicle).</summary>
+        bool InVehicle { get; }
+
+        /// <summary>Puts the ped straight into a seat: 0 = driver, 1 = front passenger, 2 and 3 = back seats.</summary>
+        void WarpInto(IVehicle vehicle, int seat);
+
+        /// <summary>Drives around like normal traffic.</summary>
+        void DriveAround();
+
+        /// <summary>Drives away from the player, fast and recklessly.</summary>
+        void DriveAway();
+
+        /// <summary>Pulls over to the side of the road and stops there.</summary>
+        void PullOver();
+
+        /// <summary>Shoots at the player from their seat (a passenger with a gun). Stays in the vehicle.</summary>
+        void ShootFromVehicle();
 
         // Arrest. A cuffed ped keeps their cuffs through the orders below.
 
@@ -64,6 +88,18 @@ namespace Callsign.Core.Ports
     {
         bool Exists { get; }
         Position Position { get; }
+
+        /// <summary>Metres per second.</summary>
+        float Speed { get; }
+
+        /// <summary>Destroyed or no longer drivable.</summary>
+        bool IsWrecked { get; }
+
+        /// <summary>How many tyres are burst (shot out, spiked).</summary>
+        int BurstTyres { get; }
+
+        /// <summary>0 = dead engine, 1 = undamaged.</summary>
+        float EngineHealth { get; }
     }
 
     /// <summary>A map marker we created.</summary>

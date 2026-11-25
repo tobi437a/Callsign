@@ -31,6 +31,15 @@ namespace Callsign.Engine
 
         public bool PlayerDead => Game.Player.IsDead;
 
+        public bool PlayerLightsOn
+        {
+            get
+            {
+                Vehicle? vehicle = Game.Player.Character.CurrentVehicle;
+                return vehicle != null && vehicle.Exists() && vehicle.IsSirenActive;
+            }
+        }
+
         public bool TryFindStreetNear(Position near, out Position position, out float heading)
         {
             Vector3 found = World.GetNextPositionOnStreetWithHeading(near.ToVector(), out heading, false);
@@ -90,7 +99,83 @@ namespace Callsign.Engine
 
         public void FleeFromPlayer() => Order(t => t.FleeFrom(Game.Player.Character));
 
-        public void FightPlayer() => Order(t => t.Combat(Game.Player.Character));
+        public void FightPlayer()
+        {
+            if (Ped.Exists()) Ped.SetCombatAttribute(CombatAttributes.CanLeaveVehicle, true);
+            Order(t => t.Combat(Game.Player.Character));
+        }
+
+        // --- vehicles ---
+
+        public bool InVehicle => Ped.Exists() && Ped.IsInVehicle();
+
+        public bool PlayerAimingAt
+        {
+            get
+            {
+                if (!Ped.Exists()) return false;
+                Player player = Game.Player;
+                if (player.IsTargeting(Ped)) return true;
+                Vehicle? vehicle = Ped.CurrentVehicle;
+                return vehicle != null && vehicle.Exists() && player.IsTargeting(vehicle);
+            }
+        }
+
+        public void WarpInto(IVehicle vehicle, int seat)
+        {
+            Vehicle v = ((GameVehicle)vehicle).Vehicle;
+            if (!Ped.Exists() || !v.Exists()) return;
+            VehicleSeat s = seat == 0 ? VehicleSeat.Driver : seat == 1 ? VehicleSeat.Passenger
+                : seat == 2 ? VehicleSeat.LeftRear : VehicleSeat.RightRear;
+            Ped.SetIntoVehicle(v, s);
+        }
+
+        public void DriveAround()
+        {
+            if (Driving(out Vehicle v))
+                Order(t => t.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles), onFoot: false);
+        }
+
+        public void DriveAway()
+        {
+            if (!Driving(out Vehicle v)) return;
+            Ped.DrivingAggressiveness = 1f;
+            Function.Call(Hash.SET_DRIVER_ABILITY, Ped, 1f);
+            Order(t => t.StartVehicleMission(v, Game.Player.Character, VehicleMissionType.Flee, 45f,
+                VehicleDrivingFlags.DrivingModeAvoidVehiclesReckless, -1f, -1f, true), onFoot: false);
+        }
+
+        public void PullOver()
+        {
+            if (!Driving(out Vehicle v)) return;
+            // Roll on a little and steer to the kerb, then brake and stay there.
+            Vector3 kerb = v.Position + v.ForwardVector * 20f + v.RightVector * 3.5f;
+            Order(_ =>
+            {
+                using (var sequence = new TaskSequence())
+                {
+                    sequence.AddTask.DriveTo(v, kerb, 6f, VehicleDrivingFlags.DrivingModeStopForVehicles, 4f);
+                    Function.Call(Hash.TASK_VEHICLE_TEMP_ACTION, 0, v, 27, 10_000);   // 27 = brake until stopped
+                    sequence.Close();
+                    Ped.Task.PerformSequence(sequence);
+                }
+            }, onFoot: false);
+        }
+
+        public void ShootFromVehicle()
+        {
+            if (!Ped.Exists() || !Ped.IsInVehicle()) return;
+            Ped.SetCombatAttribute(CombatAttributes.CanLeaveVehicle, false);
+            Ped.SetCombatAttribute(CombatAttributes.CanDoDrivebys, true);
+            Ped.Weapons.Select(Ped.Weapons.BestWeapon);
+            Order(t => t.Combat(Game.Player.Character), onFoot: false);
+        }
+
+        bool Driving(out Vehicle vehicle)
+        {
+            vehicle = Ped.Exists() ? Ped.CurrentVehicle : null!;
+            return vehicle != null && vehicle.Exists() && vehicle.Driver == Ped;
+        }
 
         public bool IsSubdued
         {
@@ -160,14 +245,30 @@ namespace Callsign.Engine
             return vehicle != null && vehicle.Exists() && !vehicle.IsDead ? vehicle : null;
         }
 
-        /// <summary>Replaces the ped's task. Our orders stick: the ped doesn't drop them to react to the world.</summary>
-        void Order(Action<TaskInvoker> task)
+        /// <summary>
+        /// Replaces the ped's task. Our orders stick: the ped doesn't drop them to react to the world.
+        /// An <paramref name="onFoot"/> order makes a ped in a vehicle get out first.
+        /// </summary>
+        void Order(Action<TaskInvoker> task, bool onFoot = true)
         {
             if (!Ped.Exists()) return;
             Ped.BlockPermanentEvents = true;
             Ped.AlwaysKeepTask = true;
             Ped.Task.ClearAll();
-            task(Ped.Task);
+            if (onFoot && Ped.IsInVehicle())
+            {
+                using (var sequence = new TaskSequence())
+                {
+                    sequence.AddTask.LeaveVehicle(LeaveVehicleFlags.None);
+                    task(sequence.AddTask);
+                    sequence.Close();
+                    Ped.Task.PerformSequence(sequence);
+                }
+            }
+            else
+            {
+                task(Ped.Task);
+            }
             // Cuffs are an upper-body animation on top of whatever the ped is told to do.
             if (_cuffed)
                 Ped.Task.PlayAnimation(CuffDict, CuffAnim, 8f, -8f, -1,
@@ -183,7 +284,8 @@ namespace Callsign.Engine
                 Ped.AlwaysKeepTask = false;
                 Ped.Task.ClearAll();
                 Ped.Task.ClearSecondary();   // uncuffed
-                if (Ped.IsInVehicle()) Ped.Task.LeaveVehicle(LeaveVehicleFlags.None);
+                if (InPlayerVehicle) Ped.Task.LeaveVehicle(LeaveVehicleFlags.None);
+                else if (Driving(out Vehicle v)) Ped.Task.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles);
             }
             ReleaseEntity(Ped, mode);
         }
@@ -203,6 +305,23 @@ namespace Callsign.Engine
         public Vehicle Vehicle { get; }
         public bool Exists => Vehicle.Exists();
         public Position Position => Vehicle.Position.ToPosition();
+        public float Speed => Vehicle.Exists() ? Vehicle.Speed : 0f;
+        public bool IsWrecked => !Vehicle.Exists() || Vehicle.IsDead || !Vehicle.IsDriveable;
+
+        // Wheel ids 0..5: front, middle (6-wheelers) and rear pairs.
+        public int BurstTyres
+        {
+            get
+            {
+                if (!Vehicle.Exists()) return 0;
+                int burst = 0;
+                for (int wheel = 0; wheel <= 5; wheel++)
+                    if (Function.Call<bool>(Hash.IS_VEHICLE_TYRE_BURST, Vehicle, wheel, false)) burst++;
+                return burst;
+            }
+        }
+
+        public float EngineHealth => Vehicle.Exists() ? Math.Max(0f, Math.Min(1f, Vehicle.EngineHealth / 1000f)) : 0f;
 
         public void Release(ReleaseMode mode) => GamePed.ReleaseEntity(Vehicle, mode);
     }

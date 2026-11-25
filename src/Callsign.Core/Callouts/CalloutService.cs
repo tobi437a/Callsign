@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
@@ -139,6 +140,9 @@ namespace Callsign.Core.Callouts
             Current = Phase.Offered;
             _offerExpiresAt = _clock.NowMs + Settings.OfferTimeoutMs;
             _services.Notifier.Notify("~b~Dispatch:~s~ ~y~" + incident.Title + "~s~~n~" + incident.DispatchMessage);
+            _services.Log.Info("Offered " + incident.Situation.Id + " @ " + incident.Location.Id + ": " + incident.Suspect.Id
+                + (incident.VehicleModel != null ? " in " + incident.VehicleModel : "")
+                + ", " + string.Join("/", incident.Suspects.Select(x => x.Outcome.Id)));
             _bus.Publish(new CalloutOffered(incident));
         }
 

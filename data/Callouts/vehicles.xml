@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Built-in calls with suspects in a vehicle, and multi-suspect calls on foot.
+  vehicle="true" situations only use suspects that have vehicles (and the others only suspects on foot).
+  Vehicle calls take place on roads (tag "road", or the street picked near the player, which dispatch
+  names by its real street name). The vehicle spawns on the nearest road to the location and drives around until the player catches up:
+  a calm driver pulls over for the player's emergency lights; anyone else flees and the call becomes a
+  pursuit. Each suspect rolls their own outcome, so passengers can run or fight when the car stops.
+-->
+<CalloutContent>
+
+  <!-- Situations -->
+  <Situation id="stolen-vehicle" title="Stolen vehicle" vehicle="true" minSuspects="1" maxSuspects="2" locationTags="road,street"
+             outcomeTags="calm,runs,violent" suspectTags="thief" weight="1.5">
+    <Dispatch>Tracker hit on a stolen {suspect} near {location}. Locate and stop the vehicle.</Dispatch>
+  </Situation>
+  <Situation id="drunk-driver" title="Possible drunk driver" vehicle="true" locationTags="road,street"
+             outcomeTags="calm,runs" suspectTags="dui" weight="1.5">
+    <Dispatch>Callers report a {suspect} swerving across lanes near {location}. Possible DUI.</Dispatch>
+  </Situation>
+  <Situation id="shots-from-vehicle" title="Shots fired from a vehicle" vehicle="true" minSuspects="2" maxSuspects="3" locationTags="road,street"
+             outcomeTags="runs,violent" suspectTags="gang" weight="0.6">
+    <Dispatch>Shots fired from a {suspect} near {location}, {count} armed occupants. Approach with caution.</Dispatch>
+  </Situation>
+  <Situation id="armed-robbery" title="Armed robbery" minSuspects="1" maxSuspects="2"
+             locationTags="store" outcomeTags="calm,runs,violent" suspectTags="robber" weight="1.5">
+    <Dispatch>Silent alarm at {location}: armed robbery in progress. Staff report {count} suspect(s) {suspect}.</Dispatch>
+  </Situation>
+
+  <!-- Suspects in vehicles -->
+  <Suspect id="thief-futo"      description="Karin Futo"          vehicles="futo"      models="a_m_y_stwhi_01,a_m_y_stlat_01,a_m_y_stbla_01" tags="thief" />
+  <Suspect id="thief-sultan"    description="Karin Sultan"        vehicles="sultan"    models="a_m_y_stwhi_02,a_m_y_stbla_02,a_m_y_stlat_01" tags="thief" />
+  <Suspect id="thief-baller"    description="Gallivanter Baller"  vehicles="baller"    models="a_m_y_stwhi_01,g_m_y_famca_01"                 tags="thief" />
+  <Suspect id="thief-vigero"    description="Declasse Vigero"     vehicles="vigero"    models="a_m_y_methhead_01,a_m_y_stlat_01"             tags="thief" />
+  <Suspect id="dui-premier"     description="Declasse Premier"    vehicles="premier"   models="a_m_m_salton_01,a_m_m_genfat_01"              tags="dui,intoxicated" />
+  <Suspect id="dui-bison"       description="Bravado Bison pickup" vehicles="bison"    models="a_m_m_hillbilly_01,a_m_m_salton_02"           tags="dui,intoxicated" />
+  <Suspect id="dui-minivan"     description="Vapid Minivan"       vehicles="minivan"   models="a_m_y_hipster_01,a_f_y_hipster_01"            tags="dui,intoxicated" />
+  <Suspect id="gang-buffalo"    description="Bravado Buffalo"     vehicles="buffalo"   models="g_m_y_ballaeast_01,g_m_y_ballaorig_01" weapon="WEAPON_PISTOL"   tags="gang,armed" />
+  <Suspect id="gang-cavalcade"  description="Albany Cavalcade"    vehicles="cavalcade" models="g_m_y_mexgoon_01,g_m_y_mexgoon_02" weapon="WEAPON_MICROSMG"     tags="gang,armed" />
+
+  <!-- Suspects on foot -->
+  <Suspect id="robber"          description="with handguns"       models="g_m_y_famca_01,a_m_y_stbla_02,g_m_y_mexgoon_03" weapon="WEAPON_PISTOL"                tags="robber" />
+
+</CalloutContent>

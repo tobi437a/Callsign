@@ -1,5 +1,6 @@
 using Callsign.Core.Callouts;
 using Callsign.Core.Ports;
+using Callsign.Core.Suspects;
 using Callsign.Core.World;
 using Xunit;
 
@@ -134,7 +135,69 @@ public class IncidentGeneratorTests
         var a = new IncidentGenerator(parts, new SeededRandom(42)).Generate(Player, 100, 1500);
         var b = new IncidentGenerator(parts, new SeededRandom(42)).Generate(Player, 100, 1500);
 
-        Assert.Equal(a, b);
+        Assert.Equal(a!.Suspects, b!.Suspects);
+        Assert.Equal(a with { Suspects = b.Suspects }, b);
+    }
+
+    [Fact]
+    public void VehicleSituationsOnlyTakeSuspectsWithVehiclesAndViceVersa()
+    {
+        var parts = new CalloutParts();
+        parts.Situations.Add(new SituationPart("car", "Stolen car", "{suspect} at {location}", [], [], [], []) { InVehicle = true });
+        parts.Situations.Add(new SituationPart("foot", "Loiterer", "{suspect} at {location}", [], [], [], []));
+        parts.Locations.Add(new LocationPart("loc", "Test St", new Position(500, 0, 0), []));
+        parts.Suspects.Add(new SuspectPart("walker", "man", ["m"], null, []));
+        parts.Suspects.Add(new SuspectPart("driver", "Karin Sultan", ["m"], null, []) { Vehicles = ["sultan"] });
+        parts.Outcomes.Add(new OutcomePart("ok", SuspectBehaviour.Comply, []));
+        var generator = new IncidentGenerator(parts, new SeededRandom(3));
+
+        for (int i = 0; i < 50; i++)
+        {
+            Incident incident = generator.Generate(Player, 100, 1500)!;
+            if (incident.Situation.Id == "car")
+            {
+                Assert.Equal("driver", incident.Suspect.Id);
+                Assert.Equal("sultan", incident.VehicleModel);
+            }
+            else
+            {
+                Assert.Equal("walker", incident.Suspect.Id);
+                Assert.Null(incident.VehicleModel);
+            }
+        }
+    }
+
+    [Fact]
+    public void RollsTheSuspectCountAndAnOutcomeForEachSuspect()
+    {
+        var parts = new CalloutParts();
+        parts.Situations.Add(new SituationPart("gang", "Gang", "{count} {suspect} at {location}", [], [], [], [])
+            { MinSuspects = 2, MaxSuspects = 3 });
+        parts.Locations.Add(new LocationPart("loc", "Test St", new Position(500, 0, 0), []));
+        parts.Suspects.Add(new SuspectPart("thug", "thugs", ["a", "b"], null, []));
+        parts.Outcomes.Add(new OutcomePart("runs", SuspectBehaviour.Flee, []));
+        parts.Outcomes.Add(new OutcomePart("fights", SuspectBehaviour.Fight, []));
+        var generator = new IncidentGenerator(parts, new SeededRandom(5));
+
+        var counts = new HashSet<int>();
+        var mixed = false;
+        for (int i = 0; i < 50; i++)
+        {
+            Incident incident = generator.Generate(Player, 100, 1500)!;
+            counts.Add(incident.Suspects.Count);
+            mixed |= incident.Suspects.Select(s => s.Outcome.Id).Distinct().Count() > 1;
+            Assert.StartsWith(incident.Suspects.Count == 2 ? "two" : "three", incident.DispatchMessage);
+        }
+        Assert.Equal([2, 3], counts.Order());
+        Assert.True(mixed);
+    }
+
+    [Fact]
+    public void BadSuspectCountsAreRejected()
+    {
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MinSuspects = 0 }.Validate());
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MinSuspects = 3, MaxSuspects = 2 }.Validate());
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MaxSuspects = 5 }.Validate());
     }
 }
 
@@ -199,5 +262,71 @@ public class CalloutContentLoaderTests
 
         Assert.Equal(0, CalloutContentLoader.Load(new StringReader("<CalloutContent><oops"), "bad.xml", new CalloutParts(), log));
         Assert.Single(log.Errors);
+    }
+}
+
+public class PursuitMindTests
+{
+    static readonly SuspectProfile Plain = new SuspectProfileGenerator(new SuspectContent(), new SeededRandom(1),
+        new TraitChances { Warrant = 0, FalseNameOtherwise = 0, NoId = 0, Intoxicated = 0, HadADrink = 0,
+            OnDrugs = 0, CarryingDrugs = 0, ConcealedWeapon = 0, NervousOtherwise = 0 }).Generate(true, [], false);
+
+    static double SecondsToBreak(PursuitMind mind, PursuitPressure pressure)
+    {
+        for (int s = 1; s <= 3600; s++)
+            if (mind.Update(pressure, 1) != PursuitChoice.KeepGoing) return s;
+        return double.PositiveInfinity;
+    }
+
+    static List<PursuitMind> Drivers(int n)
+    {
+        var random = new SeededRandom(11);
+        return Enumerable.Range(0, n).Select(_ => new PursuitMind(Plain, SuspectBehaviour.Flee, random, new PursuitSettings())).ToList();
+    }
+
+    [Fact]
+    public void SomeFoldQuicklyOthersAlmostNeverStop()
+    {
+        var chase = new PursuitPressure(0, 1, 30, 20, false);   // clean chase, player right behind
+        var times = Drivers(200).Select(m => SecondsToBreak(m, chase)).ToList();
+        Assert.Contains(times, t => t < 45);
+        Assert.Contains(times, t => t > 150);
+    }
+
+    [Fact]
+    public void ShotOutTyresAndAGunWearThemDownMuchFaster()
+    {
+        var clean = new PursuitPressure(0, 1, 30, 20, false);
+        var crippled = new PursuitPressure(3, 0.4f, 10, 20, true);
+        // Same seed, so the same 50 drivers both times.
+        var cleanTimes = Drivers(50).Select(m => SecondsToBreak(m, clean)).ToList();
+        var crippledTimes = Drivers(50).Select(m => SecondsToBreak(m, crippled)).ToList();
+        Assert.All(crippledTimes, t => Assert.True(t < 30));
+        Assert.True(cleanTimes.Average() > 3 * crippledTimes.Average());
+    }
+
+    [Fact]
+    public void SecretsAndViolenceMakeThemMoreDetermined()
+    {
+        var violent = new PursuitMind(Plain, SuspectBehaviour.Fight, new SeededRandom(4), new PursuitSettings());
+        var calm = new PursuitMind(Plain, SuspectBehaviour.Flee, new SeededRandom(4), new PursuitSettings());
+        Assert.True(violent.Resolve > calm.Resolve);
+        Assert.True(violent.Runner);
+    }
+}
+
+public class PursuitAimTests
+{
+    [Fact]
+    public void AimingAtASpeedingCarDoesNothing()
+    {
+        var profile = new SuspectProfileGenerator(new SuspectContent(), new SeededRandom(1)).Generate(true, [], false);
+        var aimed = new PursuitMind(profile, SuspectBehaviour.Flee, new SeededRandom(2), new PursuitSettings());
+        var not = new PursuitMind(profile, SuspectBehaviour.Flee, new SeededRandom(2), new PursuitSettings());
+
+        aimed.Update(new PursuitPressure(0, 1, 30, 15, true), 10);
+        not.Update(new PursuitPressure(0, 1, 30, 15, false), 10);
+
+        Assert.Equal(not.Pressure, aimed.Pressure);
     }
 }
