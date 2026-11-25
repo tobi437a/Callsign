@@ -11,6 +11,9 @@ namespace Callsign.Core.Ports
 
         bool PlayerInVehicle { get; }
 
+        /// <summary>Where the vehicle the player is in (or last used) is. False if there is none.</summary>
+        bool TryGetPlayerVehiclePosition(out Position position);
+
         bool PlayerDead { get; }
 
         /// <summary>The nearest road position to <paramref name="near"/> and the road's heading there.</summary>

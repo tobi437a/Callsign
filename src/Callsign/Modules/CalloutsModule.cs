@@ -1,4 +1,5 @@
 using Callsign.Core.Callouts;
+using Callsign.Core.Ui;
 using Callsign.Engine;
 using Keys = System.Windows.Forms.Keys;
 
@@ -10,7 +11,7 @@ namespace Callsign.Modules
         const Keys AcceptKey = Keys.Y;
         const Keys DeclineKey = Keys.N;
         const Keys InteractKey = Keys.E;
-        const Keys ReleaseKey = Keys.H;
+        const int StopHoldMs = 500;
         const Keys CancelKey = Keys.End;
         const Keys RequestKey = Keys.F9;
 
@@ -34,7 +35,9 @@ namespace Callsign.Modules
             if (_input.WasPressed(CancelKey)) _callouts.Cancel();
             if (_input.WasPressed(RequestKey)) _callouts.RequestNow();
 
-            _callouts.Tick(new CalloutInput(_input.WasPressed(InteractKey), _input.WasPressed(ReleaseKey)));
+            var menu = new MenuInput(_input.WasPressed(Keys.Up), _input.WasPressed(Keys.Down),
+                _input.WasPressed(Keys.Enter), _input.WasPressed(Keys.Back));
+            _callouts.Tick(new CalloutInput(_input.WasHeld(InteractKey, StopHoldMs), _input.WasPressed(InteractKey), menu));
 
             if (_callouts.Current == CalloutService.Phase.Offered)
                 GTA.UI.Screen.ShowHelpTextThisFrame("~y~Y~s~ accept call    ~y~N~s~ decline");

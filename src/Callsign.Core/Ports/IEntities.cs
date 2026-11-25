@@ -10,8 +10,13 @@ namespace Callsign.Core.Ports
         bool IsDead { get; }
         Position Position { get; }
 
-        /// <summary>Gives a weapon by its game name (e.g. "WEAPON_KNIFE") and equips it.</summary>
-        void GiveWeapon(string weapon);
+        bool IsMale { get; }
+
+        /// <summary>Gives a weapon by its game name (e.g. "WEAPON_KNIFE"); <paramref name="equip"/> puts it in their hand.</summary>
+        void GiveWeapon(string weapon, bool equip);
+
+        /// <summary>Takes all their weapons.</summary>
+        void RemoveWeapons();
 
         // Behaviour orders. Each replaces whatever the ped was doing; all do nothing once the ped is gone.
 
