@@ -1,3 +1,4 @@
+using Callsign.Core.Ports;
 using Callsign.Core.Duty;
 using Callsign.Core.Events;
 using Xunit;
@@ -77,5 +78,31 @@ public class DutyServiceTests
         duty.SetOnDuty(false);
 
         Assert.Equal(0, events);
+    }
+}
+
+public class SeededRandomTests
+{
+    [Fact]
+    public void TheSameSeedGivesTheSameRolls()
+    {
+        var a = new SeededRandom(42);
+        var b = new SeededRandom(42);
+
+        for (int i = 0; i < 20; i++)
+            Assert.Equal(a.Next(1000), b.Next(1000));
+    }
+
+    [Fact]
+    public void RollsStayInRange()
+    {
+        var r = new SeededRandom(1);
+
+        for (int i = 0; i < 1000; i++)
+        {
+            int n = r.Next(3, 7);
+            Assert.InRange(n, 3, 6);
+            Assert.InRange(r.NextDouble(), 0.0, 0.9999999);
+        }
     }
 }
