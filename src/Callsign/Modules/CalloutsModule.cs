@@ -11,6 +11,7 @@ namespace Callsign.Modules
         const Keys DeclineKey = Keys.N;
         const Keys InteractKey = Keys.E;
         const Keys CancelKey = Keys.End;
+        const Keys RequestKey = Keys.F9;
 
         readonly CalloutService _callouts;
         readonly KeyInput _input;
@@ -30,6 +31,7 @@ namespace Callsign.Modules
             if (_input.WasPressed(AcceptKey)) _callouts.Accept();
             if (_input.WasPressed(DeclineKey)) _callouts.Decline();
             if (_input.WasPressed(CancelKey)) _callouts.Cancel();
+            if (_input.WasPressed(RequestKey)) _callouts.RequestNow();
 
             _callouts.Tick(_input.WasPressed(InteractKey));
 

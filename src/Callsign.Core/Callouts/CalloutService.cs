@@ -75,6 +75,19 @@ namespace Callsign.Core.Callouts
             }
         }
 
+        /// <summary>
+        /// Offers a call right now instead of waiting for dispatch. Only while on duty and with no
+        /// call offered or running. False if it couldn't (including when no incident fits here).
+        /// </summary>
+        public bool RequestNow()
+        {
+            if (!_duty.OnDuty || Current == Phase.Offered || Current == Phase.Active) return false;
+            TryOffer();
+            if (Current == Phase.Offered) return true;
+            _services.Notifier.Notify("~c~Dispatch:~s~ no calls in your area right now.");
+            return false;
+        }
+
         /// <summary>Takes the offered call. False if nothing is on offer.</summary>
         public bool Accept()
         {
@@ -82,7 +95,7 @@ namespace Callsign.Core.Callouts
             Incident incident = Incident!;
             Current = Phase.Active;
             _scene = new CalloutScene(incident, _services);
-            _services.Notifier.Notify("~b~Responding~s~ to " + incident.Title + ". Follow the route on your map.");
+            _services.Notifier.Notify("~b~Responding~s~ to " + incident.Title + ".");
             _bus.Publish(new CalloutAccepted(incident));
             return true;
         }

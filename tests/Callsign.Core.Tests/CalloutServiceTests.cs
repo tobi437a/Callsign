@@ -173,6 +173,31 @@ public class CalloutServiceTests
     }
 
     [Fact]
+    public void RequestNowOffersAtOnceButOnlyOnDutyAndWhenFree()
+    {
+        UseOutcome(SuspectBehaviour.Comply);
+        Assert.False(_service.RequestNow());   // off duty
+
+        _duty.SetOnDuty(true);
+        Tick();
+        Assert.True(_service.RequestNow());
+        Assert.Equal(CalloutService.Phase.Offered, _service.Current);
+        Assert.False(_service.RequestNow());   // already offered
+    }
+
+    [Fact]
+    public void RequestNowSaysSoWhenNothingFits()
+    {
+        UseOutcome(SuspectBehaviour.Comply);
+        _world.PlayerPosition = new Position(50_000, 0, 0);
+        _duty.SetOnDuty(true);
+        Tick();
+
+        Assert.False(_service.RequestNow());
+        Assert.Contains(_notifier.Messages, m => m.Contains("no calls"));
+    }
+
+    [Fact]
     public void UnansweredOfferExpires()
     {
         UseOutcome(SuspectBehaviour.Comply);
