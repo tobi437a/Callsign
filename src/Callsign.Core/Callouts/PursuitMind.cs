@@ -34,9 +34,13 @@ namespace Callsign.Core.Callouts
         public double RatePerBurstTyre { get; set; } = 0.05;
         public double DamagedEngineRate { get; set; } = 0.05;
         public double WreckedEngineRate { get; set; } = 0.15;
-        /// <summary>The player is aiming a gun at them (within <see cref="AimDistance"/>).</summary>
-        public double AimedAtRate { get; set; } = 0.12;
-        public float AimDistance { get; set; } = 35;
+        /// <summary>
+        /// The player is aiming a gun at them from close (within <see cref="AimDistance"/>) while the car is
+        /// slow (under <see cref="AimSpeed"/>). A gun waved at a speeding car barely registers.
+        /// </summary>
+        public double AimedAtRate { get; set; } = 0.04;
+        public float AimDistance { get; set; } = 20;
+        public float AimSpeed { get; set; } = 12;
         /// <summary>The car can barely move (slower than <see cref="CrawlSpeed"/>) with the player close.</summary>
         public double CrawlingRate { get; set; } = 0.05;
         public float CrawlSpeed { get; set; } = 6;
@@ -107,7 +111,7 @@ namespace Callsign.Core.Callouts
             rate += p.BurstTyres * _s.RatePerBurstTyre;
             if (p.EngineHealth < 0.2f) rate += _s.WreckedEngineRate;
             else if (p.EngineHealth < 0.5f) rate += _s.DamagedEngineRate;
-            if (p.PlayerAiming && p.PlayerDistance <= _s.AimDistance) rate += _s.AimedAtRate;
+            if (p.PlayerAiming && p.PlayerDistance <= _s.AimDistance && p.Speed < _s.AimSpeed) rate += _s.AimedAtRate;
             if (close && p.Speed < _s.CrawlSpeed) rate += _s.CrawlingRate;
             return rate;
         }

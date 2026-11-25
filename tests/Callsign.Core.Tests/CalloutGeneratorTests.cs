@@ -314,3 +314,19 @@ public class PursuitMindTests
         Assert.True(violent.Runner);
     }
 }
+
+public class PursuitAimTests
+{
+    [Fact]
+    public void AimingAtASpeedingCarDoesNothing()
+    {
+        var profile = new SuspectProfileGenerator(new SuspectContent(), new SeededRandom(1)).Generate(true, [], false);
+        var aimed = new PursuitMind(profile, SuspectBehaviour.Flee, new SeededRandom(2), new PursuitSettings());
+        var not = new PursuitMind(profile, SuspectBehaviour.Flee, new SeededRandom(2), new PursuitSettings());
+
+        aimed.Update(new PursuitPressure(0, 1, 30, 15, true), 10);
+        not.Update(new PursuitPressure(0, 1, 30, 15, false), 10);
+
+        Assert.Equal(not.Pressure, aimed.Pressure);
+    }
+}
