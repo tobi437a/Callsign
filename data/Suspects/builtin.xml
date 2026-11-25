@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What suspects are made of: names, warrants, pocket contents, hidden weapons and dialogue.
+  Lists are comma-separated. Every file in this folder adds to the lists.
+
+  Dialogue: <Line topic="..." trait="...">. Topics: Stopped, Purpose, Drinking, HandsId, NoId.
+  A line with a trait is only said by suspects with that trait, and they prefer such lines.
+  Traits: Warrant, FalseName, NoId, Intoxicated, OnDrugs, CarryingDrugs, ConcealedWeapon, Nervous.
+  {name} = the name the suspect gives.
+
+  A suspect part (Data\Callouts) can force a trait by carrying its name as a tag, e.g. tags="intoxicated".
+-->
+<SuspectContent>
+
+  <MaleNames>James, Michael, Robert, David, Daniel, Anthony, Kevin, Brian, Jason, Ryan, Tyler, Marcus, Darnell, Andre, Carlos, Luis, Miguel, Jorge, Hector, Diego, Wei, Kenji, Tommy, Dale, Wade, Cody, Travis, Earl, Randy, Vince</MaleNames>
+  <FemaleNames>Jessica, Ashley, Amanda, Sarah, Megan, Brittany, Lauren, Tiffany, Crystal, Keisha, Tasha, Maria, Rosa, Lucia, Carmen, Ana, Mei, Yuki, Linda, Brenda, Tammy, Kayla, Destiny, Amber, Heather</FemaleNames>
+  <LastNames>Smith, Johnson, Williams, Brown, Jones, Miller, Davis, Garcia, Rodriguez, Martinez, Hernandez, Lopez, Gonzalez, Wilson, Anderson, Thomas, Taylor, Moore, Jackson, Martin, Lee, Thompson, White, Harris, Clark, Lewis, Walker, Young, Allen, King, Wright, Torres, Nguyen, Hill, Flores, Green, Baker, Nelson, Carter, Mitchell, Reyes, Cruz, Turner, Parker, Collins, Morales, Murphy, Cook, Rogers, Kim</LastNames>
+
+  <Warrants>failure to appear in court, unpaid traffic fines, probation violation, petty theft, burglary, assault, possession of a controlled substance, driving on a suspended licence, vandalism, receiving stolen property, domestic battery, check fraud</Warrants>
+
+  <PocketItems>a wallet, a phone, a set of keys, a lighter, a pack of cigarettes, some loose change, chewing gum, a bus pass, earphones, a crumpled receipt, a lottery ticket, a pack of mints</PocketItems>
+  <DrugItems>a small bag of white powder, a baggie of weed, pills in an unmarked bottle, a glass pipe with residue, several small baggies of crystals</DrugItems>
+
+  <HiddenWeapon weapon="WEAPON_SWITCHBLADE" name="a switchblade" />
+  <HiddenWeapon weapon="WEAPON_KNIFE"       name="a kitchen knife" />
+  <HiddenWeapon weapon="WEAPON_KNUCKLE"     name="brass knuckles" />
+  <HiddenWeapon weapon="WEAPON_PISTOL"      name="a loaded pistol" />
+  <HiddenWeapon weapon="WEAPON_SNSPISTOL"   name="a small handgun" />
+
+  <!-- Stopped -->
+  <Line topic="Stopped">Yes, officer?</Line>
+  <Line topic="Stopped">Evening. Something wrong?</Line>
+  <Line topic="Stopped">Uh, hi. What's this about?</Line>
+  <Line topic="Stopped" trait="Nervous">W-what? I didn't do anything.</Line>
+  <Line topic="Stopped" trait="Nervous">Is there a problem? I'm kind of in a hurry.</Line>
+  <Line topic="Stopped" trait="Intoxicated">Whoa, hey... offisher. Evening.</Line>
+  <Line topic="Stopped" trait="OnDrugs">Man, your lights are... really bright.</Line>
+
+  <!-- Purpose -->
+  <Line topic="Purpose">Just walking home.</Line>
+  <Line topic="Purpose">Waiting for a friend. She's late, as usual.</Line>
+  <Line topic="Purpose">Getting some air. Is that illegal now?</Line>
+  <Line topic="Purpose">I live around here.</Line>
+  <Line topic="Purpose" trait="Nervous">Nothing! Just... going to the store. Why?</Line>
+  <Line topic="Purpose" trait="Nervous">I was just leaving, okay? I'm leaving.</Line>
+  <Line topic="Purpose" trait="Warrant">Look, I'm just passing through. I'm not from around here.</Line>
+  <Line topic="Purpose" trait="Intoxicated">Party's... that way. Or that way. I'm going home. Probably.</Line>
+  <Line topic="Purpose" trait="OnDrugs">I'm just vibing, officer. Just vibing.</Line>
+
+  <!-- Drinking -->
+  <Line topic="Drinking">No, sir. Not a drop.</Line>
+  <Line topic="Drinking">I don't drink.</Line>
+  <Line topic="Drinking">One beer with dinner, hours ago.</Line>
+  <Line topic="Drinking" trait="Intoxicated">Maybe a couple beers. Like... two. Three.</Line>
+  <Line topic="Drinking" trait="Intoxicated">Define "drinking".</Line>
+  <Line topic="Drinking" trait="Intoxicated">I'm fine! I'm totally fine. I'm walking, not driving.</Line>
+  <Line topic="Drinking" trait="OnDrugs">Nah, nothing. Why's everyone asking me that?</Line>
+  <Line topic="Drinking" trait="OnDrugs">Just some... medicine. For my back.</Line>
+
+  <!-- HandsId -->
+  <Line topic="HandsId">Sure, here you go.</Line>
+  <Line topic="HandsId">Fine. Here.</Line>
+  <Line topic="HandsId">Do you really need it? ...Okay, here.</Line>
+  <Line topic="HandsId" trait="Nervous">Y-yeah, hold on. Here.</Line>
+
+  <!-- NoId -->
+  <Line topic="NoId">I left my wallet at home. I'm {name}.</Line>
+  <Line topic="NoId">Don't have it on me. Name's {name}.</Line>
+  <Line topic="NoId" trait="FalseName">I, uh, lost it. It's {name}.</Line>
+  <Line topic="NoId" trait="FalseName">Someone stole my wallet. I'm {name}, you can check.</Line>
+  <Line topic="NoId" trait="Intoxicated">My ID's... somewhere. I'm {name}! Everybody knows me.</Line>
+
+</SuspectContent>
