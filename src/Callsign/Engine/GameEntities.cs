@@ -1,6 +1,7 @@
 using System;
 using GTA;
 using GTA.Math;
+using GTA.Native;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
 using Callsign.Core.World;
@@ -18,6 +19,8 @@ namespace Callsign.Engine
         public Position PlayerPosition => Game.Player.Character.Position.ToPosition();
 
         public bool PlayerOnFoot => Game.Player.Character.IsOnFoot;
+
+        public bool PlayerInVehicle => Game.Player.Character.IsInVehicle();
 
         public bool PlayerDead => Game.Player.IsDead;
 
@@ -48,6 +51,11 @@ namespace Callsign.Engine
 
     internal sealed class GamePed : IPed
     {
+        const string CuffDict = "mp_arresting";
+        const string CuffAnim = "idle";
+
+        bool _cuffed;
+
         public GamePed(Ped ped) { Ped = ped; }
 
         public Ped Ped { get; }
@@ -70,6 +78,74 @@ namespace Callsign.Engine
 
         public void FightPlayer() => Order(t => t.Combat(Game.Player.Character));
 
+        public bool IsSubdued
+        {
+            get
+            {
+                if (!Ped.Exists() || Ped.IsDead) return false;
+                if (Ped.IsBeingStunned) return true;
+                // Health above the "dies" line, as a share of what it can be: under half = gives up.
+                float floor = Math.Max(0f, Ped.FatalInjuryHealthThreshold);
+                float range = Ped.MaxHealthFloat - floor;
+                return range > 0 && (Ped.HealthFloat - floor) <= range * 0.5f;
+            }
+        }
+
+        public bool TryCuff()
+        {
+            if (!Ped.Exists()) return true;
+            if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, CuffDict))
+            {
+                Function.Call(Hash.REQUEST_ANIM_DICT, CuffDict);
+                return false;
+            }
+            Ped.Weapons.RemoveAll();
+            _cuffed = true;
+            Order(t => t.StandStill(-1));
+            return true;
+        }
+
+        public void FollowPlayer() =>
+            Order(t => t.FollowToOffsetFromEntity(Game.Player.Character, new Vector3(0.6f, -1.2f, 0f), 1.6f, -1, 1.5f, true));
+
+        public bool EnterPlayerVehicle(bool warp)
+        {
+            Vehicle? vehicle = PlayerVehicle();
+            if (vehicle == null || !Ped.Exists()) return false;
+            VehicleSeat seat = vehicle.IsSeatFree(VehicleSeat.RightRear) ? VehicleSeat.RightRear
+                : vehicle.IsSeatFree(VehicleSeat.LeftRear) ? VehicleSeat.LeftRear
+                : VehicleSeat.None;
+            if (seat == VehicleSeat.None) return false;
+
+            if (warp)
+            {
+                Ped.SetIntoVehicle(vehicle, seat);
+                Order(t => t.StandStill(-1));
+            }
+            else
+            {
+                Order(t => t.EnterVehicle(vehicle, seat, 20_000, 1.5f, EnterVehicleFlags.None));
+            }
+            return true;
+        }
+
+        public bool InPlayerVehicle
+        {
+            get
+            {
+                Vehicle? vehicle = PlayerVehicle();
+                return vehicle != null && Ped.Exists() && Ped.IsInVehicle(vehicle);
+            }
+        }
+
+        /// <summary>The vehicle the player is in, or last drove, if it still exists.</summary>
+        static Vehicle? PlayerVehicle()
+        {
+            Ped player = Game.Player.Character;
+            Vehicle? vehicle = player.CurrentVehicle ?? player.LastVehicle;
+            return vehicle != null && vehicle.Exists() && !vehicle.IsDead ? vehicle : null;
+        }
+
         /// <summary>Replaces the ped's task. Our orders stick: the ped doesn't drop them to react to the world.</summary>
         void Order(Action<TaskInvoker> task)
         {
@@ -78,6 +154,10 @@ namespace Callsign.Engine
             Ped.AlwaysKeepTask = true;
             Ped.Task.ClearAll();
             task(Ped.Task);
+            // Cuffs are an upper-body animation on top of whatever the ped is told to do.
+            if (_cuffed)
+                Ped.Task.PlayAnimation(CuffDict, CuffAnim, 8f, -8f, -1,
+                    AnimationFlags.Loop | AnimationFlags.UpperBodyOnly | AnimationFlags.Secondary, 0f);
         }
 
         public void Release(ReleaseMode mode)
@@ -88,6 +168,8 @@ namespace Callsign.Engine
                 Ped.BlockPermanentEvents = false;
                 Ped.AlwaysKeepTask = false;
                 Ped.Task.ClearAll();
+                Ped.Task.ClearSecondary();   // uncuffed
+                if (Ped.IsInVehicle()) Ped.Task.LeaveVehicle(LeaveVehicleFlags.None);
             }
             ReleaseEntity(Ped, mode);
         }
@@ -120,7 +202,10 @@ namespace Callsign.Engine
         public bool Exists => _blip.Exists();
         public string Name { set { if (_blip.Exists()) _blip.Name = value; } }
         public bool ShowRoute { set { if (_blip.Exists()) _blip.ShowRoute = value; } }
-        public MarkerColor Color { set { if (_blip.Exists()) _blip.Color = value == MarkerColor.Red ? BlipColor.Red : BlipColor.Yellow; } }
+        public MarkerColor Color { set { if (_blip.Exists()) _blip.Color = ToBlipColor(value); } }
+
+        static BlipColor ToBlipColor(MarkerColor color) =>
+            color == MarkerColor.Red ? BlipColor.Red : color == MarkerColor.Blue ? BlipColor.Blue : BlipColor.Yellow;
 
         // Markers are always removed, whatever the mode: a dismissed scene leaves nothing on the map.
         public void Release(ReleaseMode mode) { if (_blip.Exists()) _blip.Delete(); }

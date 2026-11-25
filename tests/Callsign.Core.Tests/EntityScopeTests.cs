@@ -40,6 +40,21 @@ public class EntityScopeTests
     }
 
     [Fact]
+    public void ReleasingOneItemEarlyStopsTrackingIt()
+    {
+        var released = new List<string>();
+        var scope = new EntityScopes(new CountingLog()).Open("test");
+        var ped = scope.Track(new Thing(released, "ped"));
+        scope.Track(new Thing(released, "blip"));
+
+        scope.Release(ped, ReleaseMode.Delete);
+        scope.Release(ped, ReleaseMode.Delete);   // not tracked any more: nothing happens
+        scope.Close(ReleaseMode.Dismiss);
+
+        Assert.Equal(new[] { "ped:Delete", "blip:Dismiss" }, released);
+    }
+
+    [Fact]
     public void ClosingTwiceReleasesOnce()
     {
         var released = new List<string>();

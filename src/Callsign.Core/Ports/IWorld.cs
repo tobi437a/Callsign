@@ -9,6 +9,8 @@ namespace Callsign.Core.Ports
 
         bool PlayerOnFoot { get; }
 
+        bool PlayerInVehicle { get; }
+
         bool PlayerDead { get; }
 
         /// <summary>The nearest road position to <paramref name="near"/> and the road's heading there.</summary>

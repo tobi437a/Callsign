@@ -10,6 +10,7 @@ namespace Callsign.Modules
         const Keys AcceptKey = Keys.Y;
         const Keys DeclineKey = Keys.N;
         const Keys InteractKey = Keys.E;
+        const Keys ReleaseKey = Keys.H;
         const Keys CancelKey = Keys.End;
         const Keys RequestKey = Keys.F9;
 
@@ -33,7 +34,7 @@ namespace Callsign.Modules
             if (_input.WasPressed(CancelKey)) _callouts.Cancel();
             if (_input.WasPressed(RequestKey)) _callouts.RequestNow();
 
-            _callouts.Tick(_input.WasPressed(InteractKey));
+            _callouts.Tick(new CalloutInput(_input.WasPressed(InteractKey), _input.WasPressed(ReleaseKey)));
 
             if (_callouts.Current == CalloutService.Phase.Offered)
                 GTA.UI.Screen.ShowHelpTextThisFrame("~y~Y~s~ accept call    ~y~N~s~ decline");

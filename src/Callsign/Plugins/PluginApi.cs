@@ -103,6 +103,7 @@ namespace Callsign.Plugins
                 case CoreEndReason.SuspectEscaped: return ApiEndReason.SuspectEscaped;
                 case CoreEndReason.SuspectDied: return ApiEndReason.SuspectDied;
                 case CoreEndReason.Cancelled: return ApiEndReason.Cancelled;
+                case CoreEndReason.Arrested: return ApiEndReason.Arrested;
                 default: return ApiEndReason.Failed;
             }
         }

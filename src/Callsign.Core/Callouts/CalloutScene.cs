@@ -1,4 +1,5 @@
 using System;
+using Callsign.Core.Arrest;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
 using Callsign.Core.World;
@@ -13,18 +14,24 @@ namespace Callsign.Core.Callouts
         IWorld World,
         INotifier Notifier,
         ILog Log,
-        CalloutSettings Settings);
+        CalloutSettings Settings,
+        CustodyServices Custody);
+
+    /// <summary>What the player pressed this frame that a callout reacts to.</summary>
+    /// <param name="Interact">Deal with the suspect: arrest them.</param>
+    /// <param name="Release">Let the suspect go.</param>
+    public readonly record struct CalloutInput(bool Interact = false, bool Release = false);
 
     /// <summary>
     /// Plays out one accepted incident, one tick at a time:
-    /// en route → (suspect spawns when close) → on scene → suspect reacts → ended.
+    /// en route → (suspect spawns when close) → on scene → suspect reacts → arrested or let go → ended.
     /// Everything it spawns lives in its own entity scope.
     /// </summary>
     public sealed class CalloutScene
     {
-        public enum Stage { EnRoute, Spawning, Approaching, Engaged, Surrendered, Ended }
+        public enum Stage { EnRoute, Spawning, Approaching, Engaged, Surrendered, InCustody, Ended }
 
-        public const string InteractHelp = "Press ~INPUT_CONTEXT~ to deal with the suspect";
+        public const string InteractHelp = "~INPUT_CONTEXT~ arrest the suspect~n~~y~H~s~ let them go";
 
         readonly Incident _incident;
         readonly CalloutSceneServices _s;
@@ -32,6 +39,8 @@ namespace Callsign.Core.Callouts
         readonly Position _spot;
         IBlip? _areaBlip;
         IPed? _suspect;
+        IBlip? _suspectBlip;
+        Custody? _custody;
 
         public CalloutScene(Incident incident, CalloutSceneServices services)
         {
@@ -49,8 +58,7 @@ namespace Callsign.Core.Callouts
         public Stage Current { get; private set; } = Stage.EnRoute;
 
         /// <summary>Advances the scene. Returns the end reason once it is over, otherwise null.</summary>
-        /// <param name="interactPressed">The player pressed the interact key this frame.</param>
-        public CalloutEndReason? Tick(bool interactPressed)
+        public CalloutEndReason? Tick(CalloutInput input)
         {
             if (Current == Stage.Ended) return null;
             if (_s.World.PlayerDead) return End(CalloutEndReason.Cancelled);
@@ -64,6 +72,9 @@ namespace Callsign.Core.Callouts
 
                 case Stage.Spawning:
                     return TrySpawn();
+
+                case Stage.InCustody:
+                    return TickCustody();
             }
 
             // From here on the suspect exists (or did).
@@ -79,13 +90,14 @@ namespace Callsign.Core.Callouts
                     return null;
 
                 case Stage.Engaged when _incident.Outcome.Behaviour == SuspectBehaviour.Comply:
-                    return OfferInteraction(distance, interactPressed);
+                    return OfferInteraction(suspect, distance, input);
 
                 case Stage.Engaged:
                     if (distance > _s.Settings.EscapeDistance)
                         return End(CalloutEndReason.SuspectEscaped, "~o~The suspect got away.~s~");
-                    if (_incident.Outcome.Behaviour == SuspectBehaviour.Flee
-                        && distance <= _s.Settings.CatchDistance && _s.World.PlayerOnFoot)
+                    bool caught = _incident.Outcome.Behaviour == SuspectBehaviour.Flee
+                        && distance <= _s.Settings.CatchDistance && _s.World.PlayerOnFoot;
+                    if (caught || suspect.IsSubdued)
                     {
                         suspect.HandsUp();
                         _s.Notifier.Notify("The suspect ~g~gave up~s~.");
@@ -94,7 +106,7 @@ namespace Callsign.Core.Callouts
                     return null;
 
                 case Stage.Surrendered:
-                    return OfferInteraction(distance, interactPressed);
+                    return OfferInteraction(suspect, distance, input);
             }
             return null;
         }
@@ -120,11 +132,11 @@ namespace Callsign.Core.Callouts
 
         void Engage(IPed suspect)
         {
-            _areaBlip?.Release(ReleaseMode.Dismiss);
+            if (_areaBlip != null) _scope.Release(_areaBlip, ReleaseMode.Dismiss);
             _areaBlip = null;
-            IBlip marker = _s.Blips.On(_scope, suspect);
-            marker.Name = "Suspect";
-            marker.Color = MarkerColor.Red;
+            _suspectBlip = _s.Blips.On(_scope, suspect);
+            _suspectBlip.Name = "Suspect";
+            _suspectBlip.Color = MarkerColor.Red;
 
             switch (_incident.Outcome.Behaviour)
             {
@@ -144,15 +156,39 @@ namespace Callsign.Core.Callouts
             Current = Stage.Engaged;
         }
 
-        CalloutEndReason? OfferInteraction(float distance, bool interactPressed)
+        CalloutEndReason? OfferInteraction(IPed suspect, float distance, CalloutInput input)
         {
             if (distance > _s.Settings.InteractDistance || !_s.World.PlayerOnFoot) return null;
-            if (!interactPressed)
+            if (input.Interact)
             {
-                _s.Notifier.Help(InteractHelp);
+                _custody = new Custody(suspect, _scope, _s.Custody);
+                if (_suspectBlip != null)
+                {
+                    _suspectBlip.Name = "Prisoner";
+                    _suspectBlip.Color = MarkerColor.Blue;
+                }
+                Current = Stage.InCustody;
                 return null;
             }
-            return End(CalloutEndReason.Resolved, "~g~Suspect dealt with.~s~ Code 4.");
+            if (input.Release) return End(CalloutEndReason.Resolved, "Suspect ~g~let go~s~ with a warning. Code 4.");
+            _s.Notifier.Help(InteractHelp);
+            return null;
+        }
+
+        CalloutEndReason? TickCustody()
+        {
+            switch (_custody!.Tick())
+            {
+                case CustodyOutcome.Booked:
+                    string where = _custody.Station != null ? " at " + _custody.Station.Name : "";
+                    return End(CalloutEndReason.Arrested, "~g~Suspect booked~s~" + where + ". Code 4.");
+                case CustodyOutcome.PrisonerDied:
+                    return End(CalloutEndReason.SuspectDied, "~r~The prisoner died.~s~");
+                case CustodyOutcome.PrisonerLost:
+                    return End(CalloutEndReason.SuspectEscaped, "~o~The prisoner is gone.~s~");
+                default:
+                    return null;
+            }
         }
 
         CalloutEndReason End(CalloutEndReason reason, string? message = null)

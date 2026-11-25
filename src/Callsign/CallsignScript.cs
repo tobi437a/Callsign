@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using GTA;
+using Callsign.Core.Arrest;
 using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
@@ -41,9 +42,17 @@ namespace Callsign
             var parts = new CalloutParts();
             int partCount = CalloutContentLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Callouts"), parts, _log);
             _log.Info("Loaded " + partCount + " callout part(s)");
-            var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameBlips(),
-                new GameWorld(), new GameNotifier(), _log, new CalloutSettings());
-            var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, new GameClock(), random, sceneServices);
+            List<PoliceStation> stations = StationLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Arrest"), _log);
+            _log.Info("Loaded " + stations.Count + " police station(s)");
+
+            var world = new GameWorld();
+            var blips = new GameBlips();
+            var notifier = new GameNotifier();
+            var clock = new GameClock();
+            var custody = new CustodyServices(world, blips, notifier, clock, stations, new CustodySettings());
+            var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), blips,
+                world, notifier, _log, new CalloutSettings(), custody);
+            var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
 
             // --- modules, in tick order (plugins last) ---
             _modules.Add(new DutyModule(duty, bus, _input));
