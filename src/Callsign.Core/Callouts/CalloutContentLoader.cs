@@ -63,24 +63,18 @@ namespace Callsign.Core.Callouts
             foreach (var s in content.Situations)
                 added += TryAdd(sourceName, "situation", s.Id, log, () =>
                 {
-                    Require(s.Title, "title");
-                    Require(s.Dispatch, "Dispatch");
-                    parts.Situations.Add(new SituationPart(s.Id!, s.Title!, s.Dispatch!.Trim(),
+                    parts.Situations.Add(new SituationPart(s.Id!, s.Title!, (s.Dispatch ?? "").Trim(),
                         Tags(s.LocationTags), Tags(s.SuspectTags), Tags(s.OutcomeTags), Tags(s.Tags), s.Weight));
                 });
             foreach (var l in content.Locations)
                 added += TryAdd(sourceName, "location", l.Id, log, () =>
                 {
-                    Require(l.Name, "name");
                     parts.Locations.Add(new LocationPart(l.Id!, l.Name!, new Position(l.X, l.Y, l.Z), Tags(l.Tags), l.Weight));
                 });
             foreach (var p in content.Suspects)
                 added += TryAdd(sourceName, "suspect", p.Id, log, () =>
                 {
-                    Require(p.Description, "description");
-                    var models = Tags(p.Models);
-                    if (models.Count == 0) throw new FormatException("needs at least one model");
-                    parts.Suspects.Add(new SuspectPart(p.Id!, p.Description!, models,
+                    parts.Suspects.Add(new SuspectPart(p.Id!, p.Description!, Tags(p.Models),
                         string.IsNullOrWhiteSpace(p.Weapon) ? null : p.Weapon!.Trim(), Tags(p.Tags), p.Weight));
                 });
             foreach (var o in content.Outcomes)
@@ -105,11 +99,6 @@ namespace Callsign.Core.Callouts
                 log.Warn(source + ": skipped " + kind + " '" + (id ?? "?") + "': " + ex.Message);
                 return 0;
             }
-        }
-
-        static void Require(string? value, string name)
-        {
-            if (string.IsNullOrWhiteSpace(value)) throw new FormatException("missing " + name);
         }
 
         static IReadOnlyList<string> Tags(string? csv) =>

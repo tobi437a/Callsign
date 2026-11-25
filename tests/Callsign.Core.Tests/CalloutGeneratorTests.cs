@@ -57,6 +57,17 @@ public class PartRegistryTests
         Assert.Throws<ArgumentException>(() => registry.Add(Outcome("A")));
         Assert.Throws<ArgumentException>(() => registry.Add(Outcome(" ")));
     }
+
+    [Fact]
+    public void RejectsIncompleteParts()
+    {
+        var parts = new CalloutParts();
+
+        Assert.Throws<ArgumentException>(() => parts.Suspects.Add(new SuspectPart("s", "man", [], null, [])));
+        Assert.Throws<ArgumentException>(() => parts.Locations.Add(new LocationPart("l", " ", default, [])));
+        Assert.Throws<ArgumentException>(() => parts.Situations.Add(new SituationPart("x", "Title", "", [], [], [], [])));
+        Assert.Throws<ArgumentException>(() => parts.Outcomes.Add(new OutcomePart("o", (SuspectBehaviour)99, [])));
+    }
 }
 
 public class IncidentGeneratorTests

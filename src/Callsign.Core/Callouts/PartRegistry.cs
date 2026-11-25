@@ -14,11 +14,12 @@ namespace Callsign.Core.Callouts
 
         public IReadOnlyList<T> All => _parts;
 
-        /// <exception cref="ArgumentException">The id is empty or already registered.</exception>
+        /// <exception cref="ArgumentException">The id is empty or already registered, or the part is incomplete.</exception>
         public IDisposable Add(T part)
         {
             if (part == null) throw new ArgumentNullException(nameof(part));
             if (string.IsNullOrWhiteSpace(part.Id)) throw new ArgumentException("A part needs an id", nameof(part));
+            part.Validate();
             if (Contains(part.Id)) throw new ArgumentException("A " + typeof(T).Name + " with id '" + part.Id + "' is already registered", nameof(part));
             _parts.Add(part);
             return new Removal(() => _parts.Remove(part));

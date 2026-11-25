@@ -1,4 +1,5 @@
 using System;
+using Callsign.API.Callouts;
 using Callsign.API.Events;
 
 namespace Callsign.API
@@ -13,6 +14,9 @@ namespace Callsign.API
 
         /// <summary>Duty state of the player.</summary>
         IDutyApi Duty { get; }
+
+        /// <summary>Callouts: add callout parts and follow calls. Since API 0.2.</summary>
+        ICalloutsApi Callouts { get; }
 
         /// <summary>Writes to Callsign.log, prefixed with the plugin's name.</summary>
         IPluginLog Log { get; }

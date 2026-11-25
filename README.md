@@ -148,10 +148,34 @@ All callbacks run on the game's script thread.
 | `ICallsignApi.Duty.SetOnDuty(bool)` | Put the player on or off duty (same as pressing the key). |
 | `ICallsignApi.Duty.DutyChanged` | Raised after the player goes on or off duty. |
 | `ICallsignApi.Log` | `Info` / `Warn` / `Error` into `Callsign.log`. |
+| `ICallsignApi.Callouts.AddSituation / AddLocation / AddSuspect / AddOutcome` | Add callout parts (since 0.2). |
+| `ICallsignApi.Callouts.Current` | The call currently offered or running, or null. |
+| `ICallsignApi.Callouts.CalloutOffered / CalloutAccepted / CalloutEnded` | Follow calls as they happen. |
 
-Coming as the features are built: registering your own callouts and callout parts (locations,
-situations, suspect profiles, twists), suspect behaviours, interaction-menu options, more events
-(callouts, pursuits, arrests, shifts, promotions), and services for spawning, backup and the career.
+Coming as the features are built: fully custom callouts, more part kinds (twists), suspect
+behaviours, interaction-menu options, more events (pursuits, arrests, shifts, promotions), and
+services for spawning, backup and the career.
+
+### Adding callout content
+Every call is drawn as **situation × location × suspect × outcome** from all registered parts,
+built-in and from every plugin. Situations pick the other parts by tag, so what you add mixes
+with everything else:
+
+```csharp
+api.Callouts.AddSituation(new CalloutSituation(
+    "myplugin-noise-complaint", "Noise complaint",
+    "Neighbours report a {suspect} playing loud music near {location}.",
+    locationTags: new[] { "public" }, outcomeTags: new[] { "calm", "violent" }));
+
+api.Callouts.AddLocation(new CalloutLocation(
+    "myplugin-pillbox", "Pillbox Hill Medical Center", new Vector3(298f, -584f, 43f),
+    new[] { "public", "city" }));
+```
+
+- Ids must be unique across all plugins: start them with your plugin's name.
+- Built-in tags: locations `store`, `public`, `street`, `city`, `county`; suspects `rowdy`,
+  `armed`; outcomes `calm`, `runs`, `violent`.
+- Your parts are removed when your plugin unloads.
 
 ### Compatibility
 `Callsign.API` follows semantic versioning. Within a major version, updates only **add**
@@ -169,7 +193,8 @@ Plugin DLLs are never locked by the game.
 ## Roadmap
 - [x] On/off duty
 - [x] Plugin API foundation
-- [ ] Callouts assembled from parts, with mid-call twists
+- [x] Callouts assembled from parts (plugins can add parts)
+- [ ] Mid-call twists
 - [ ] Arrests: cuffing, transport, booking
 - [ ] Traffic and pedestrian stops
 - [ ] Pacing director: calm after chaos, no repeats back-to-back

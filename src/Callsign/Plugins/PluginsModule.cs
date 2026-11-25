@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Callsign.API;
+using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Events;
 using Callsign.Core.Ports;
@@ -17,15 +18,19 @@ namespace Callsign.Plugins
     {
         readonly string _pluginDirectory;
         readonly DutyService _duty;
+        readonly CalloutParts _parts;
+        readonly CalloutService _callouts;
         readonly IEventBus _bus;
         readonly ILog _log;
         readonly List<LoadedPlugin> _loaded = new List<LoadedPlugin>();
         PluginLoader? _loader;
 
-        public PluginsModule(string pluginDirectory, DutyService duty, IEventBus bus, ILog log)
+        public PluginsModule(string pluginDirectory, DutyService duty, CalloutParts parts, CalloutService callouts, IEventBus bus, ILog log)
         {
             _pluginDirectory = pluginDirectory;
             _duty = duty;
+            _parts = parts;
+            _callouts = callouts;
             _bus = bus;
             _log = log;
         }
@@ -37,7 +42,7 @@ namespace Callsign.Plugins
             _loader = new PluginLoader(_pluginDirectory, _log);
             foreach (Plugin plugin in _loader.LoadAll())
             {
-                var loaded = new LoadedPlugin(plugin, new PluginApi(SafeName(plugin), _duty, _bus, _log));
+                var loaded = new LoadedPlugin(plugin, new PluginApi(SafeName(plugin), _duty, _parts, _callouts, _bus, _log));
                 if (Guard(loaded, "OnLoad", () => plugin.OnLoad(loaded.Api)))
                 {
                     _loaded.Add(loaded);
@@ -58,7 +63,10 @@ namespace Callsign.Plugins
 
         public void Stop()
         {
-            foreach (var p in _loaded) Guard(p, "OnUnload", p.Plugin.OnUnload);
+            foreach (var p in _loaded)
+            {
+                if (Guard(p, "OnUnload", p.Plugin.OnUnload)) p.Api.Dispose();   // Guard disposes on failure
+            }
             _loaded.Clear();
             _loader?.Dispose();
         }
