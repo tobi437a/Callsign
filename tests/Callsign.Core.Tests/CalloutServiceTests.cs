@@ -1,3 +1,4 @@
+using Callsign.Core.Arrest;
 using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
@@ -18,6 +19,7 @@ sealed class FakeWorld : IWorld
 {
     public Position PlayerPosition { get; set; }
     public bool PlayerOnFoot { get; set; } = true;
+    public bool PlayerInVehicle { get; set; }
     public bool PlayerDead { get; set; }
     public bool HasStreets { get; set; }
 
@@ -47,6 +49,30 @@ sealed class FakePed(Position at) : IPed
     public void HandsUp() => Order = "handsup";
     public void FleeFromPlayer() => Order = "flee";
     public void FightPlayer() => Order = "fight";
+
+    public bool IsSubdued { get; set; }
+    public int CuffLoadTicks = 1;   // first call "streams the animation"
+    public bool Cuffed { get; private set; }
+    public bool HasFreeSeat = true;
+    public bool InPlayerVehicle { get; set; }
+
+    public bool TryCuff()
+    {
+        if (CuffLoadTicks-- > 0) return false;
+        Cuffed = true;
+        Order = "cuffed";
+        return true;
+    }
+
+    public void FollowPlayer() => Order = "follow";
+
+    public bool EnterPlayerVehicle(bool warp)
+    {
+        if (!HasFreeSeat) return false;
+        Order = warp ? "warp" : "enter";
+        if (warp) InPlayerVehicle = true;
+        return true;
+    }
     public void Release(ReleaseMode mode) => Released = mode;
 }
 
@@ -103,6 +129,7 @@ sealed class NullLog : ILog
 public class CalloutServiceTests
 {
     static readonly Position Scene = new(1000, 0, 0);
+    static readonly PoliceStation Station = new("hq", "HQ", new Position(0, 5000, 0));
 
     readonly FakeClock _clock = new();
     readonly FakeWorld _world = new();
@@ -131,13 +158,14 @@ public class CalloutServiceTests
         _parts.Suspects.Add(new SuspectPart("sus", "man", ["model"], "WEAPON_KNIFE", []));
 
         var random = new SeededRandom(7);
-        var services = new CalloutSceneServices(_scopes, _peds, _blips, _world, _notifier, _log, _settings);
+        var custody = new CustodyServices(_world, _blips, _notifier, _clock, [Station], new CustodySettings());
+        var services = new CalloutSceneServices(_scopes, _peds, _blips, _world, _notifier, _log, _settings, custody);
         _service = new CalloutService(new IncidentGenerator(_parts, random), _duty, _bus, _clock, random, services);
     }
 
     void UseOutcome(SuspectBehaviour behaviour) => _parts.Outcomes.Add(new OutcomePart("out", behaviour, []));
 
-    void Tick(bool interact = false) => _service.Tick(interact);
+    void Tick(bool interact = false, bool release = false) => _service.Tick(new CalloutInput(interact, release));
 
     void Advance(long ms) { _clock.NowMs += ms; Tick(); }
 
@@ -228,7 +256,7 @@ public class CalloutServiceTests
     }
 
     [Fact]
-    public void CompliantSuspectIsResolvedByInteracting()
+    public void CompliantSuspectCanBeLetGo()
     {
         UseOutcome(SuspectBehaviour.Comply);
         FakePed suspect = StartAndArrive();
@@ -238,7 +266,7 @@ public class CalloutServiceTests
         _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
         Tick();
         Assert.Equal(CalloutScene.InteractHelp, _notifier.HelpShown);
-        Tick(interact: true);
+        Tick(release: true);
 
         Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
         Assert.Equal(ReleaseMode.Dismiss, suspect.Released);
@@ -261,9 +289,74 @@ public class CalloutServiceTests
         _world.PlayerOnFoot = true;
         Tick();
         Assert.Equal("handsup", suspect.Order);
-        Tick(interact: true);
+        Tick(release: true);
 
         Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
+    }
+
+    [Fact]
+    public void ArrestedSuspectIsBookedAtTheStation()
+    {
+        UseOutcome(SuspectBehaviour.Comply);
+        FakePed suspect = StartAndArrive();
+        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
+
+        Tick(interact: true);   // arrest
+        Tick();                 // cuff animation streaming
+        Tick();                 // cuffed
+        Assert.True(suspect.Cuffed);
+        Assert.Equal("follow", suspect.Order);
+
+        _world.PlayerInVehicle = true;
+        Tick();
+        Assert.Equal("enter", suspect.Order);
+        suspect.InPlayerVehicle = true;
+        Tick();   // seated: transport starts, route to the station
+        Assert.Contains(_blips.All, b => b.Exists && b.Color == MarkerColor.Blue);
+
+        _world.PlayerPosition = Station.Position;
+        Tick();
+
+        CalloutEnded ended = Ended();
+        Assert.Equal(CalloutEndReason.Arrested, ended.Reason);
+        Assert.Equal(ReleaseMode.Delete, suspect.Released);
+        Assert.Contains(_notifier.Messages, m => m.Contains("HQ"));
+        Assert.All(_blips.All, b => Assert.False(b.Exists));
+        Assert.Equal(0, _scopes.OpenCount);
+    }
+
+    [Fact]
+    public void FightingSuspectSurrendersOnceSubdued()
+    {
+        UseOutcome(SuspectBehaviour.Fight);
+        FakePed suspect = StartAndArrive();
+        Tick();
+        Assert.Equal("fight", suspect.Order);
+
+        suspect.IsSubdued = true;
+        Tick();
+
+        Assert.Equal("handsup", suspect.Order);
+        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
+        Tick(interact: true);
+        Tick();
+        Tick();
+        Assert.True(suspect.Cuffed);
+    }
+
+    [Fact]
+    public void PrisonerDyingEndsTheCall()
+    {
+        UseOutcome(SuspectBehaviour.Comply);
+        FakePed suspect = StartAndArrive();
+        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
+        Tick(interact: true);
+
+        suspect.IsDead = true;
+        Tick();
+
+        Assert.Equal(CalloutEndReason.SuspectDied, Ended().Reason);
+        Assert.Equal(0, _scopes.OpenCount);
     }
 
     [Fact]
@@ -343,14 +436,6 @@ public class CalloutServiceTests
 
 public class BuiltInContentTests
 {
-    sealed class ListLog : ILog
-    {
-        public readonly List<string> Problems = [];
-        public void Info(string message) { }
-        public void Warn(string message) => Problems.Add(message);
-        public void Error(string message, Exception? exception = null) => Problems.Add(message);
-    }
-
     [Fact]
     public void ShippedDataLoadsWithoutProblemsAndEverySituationIsPlayable()
     {

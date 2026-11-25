@@ -36,7 +36,7 @@ namespace Callsign.Core.Entities
             if (IsClosed)
             {
                 _log.Warn("Scope '" + Name + "' is closed; deleting an entity tracked after close");
-                Release(item, ReleaseMode.Delete);
+                ReleaseSafely(item, ReleaseMode.Delete);
                 return item;
             }
             _items.Add(item);
@@ -49,12 +49,18 @@ namespace Callsign.Core.Entities
             if (IsClosed) return;
             IsClosed = true;
             for (int i = _items.Count - 1; i >= 0; i--)
-                Release(_items[i], mode);
+                ReleaseSafely(_items[i], mode);
             _items.Clear();
             _onClosed(this);
         }
 
-        void Release(ITracked item, ReleaseMode mode)
+        /// <summary>Releases one item now, before the scene ends; the scope stops tracking it.</summary>
+        public void Release(ITracked item, ReleaseMode mode)
+        {
+            if (_items.Remove(item)) ReleaseSafely(item, mode);
+        }
+
+        void ReleaseSafely(ITracked item, ReleaseMode mode)
         {
             try { item.Release(mode); }
             catch (Exception ex) { _log.Error("Scope '" + Name + "': releasing an entity failed", ex); }

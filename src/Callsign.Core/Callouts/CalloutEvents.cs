@@ -15,7 +15,7 @@ namespace Callsign.Core.Callouts
         Declined,
         /// <summary>The offer timed out unanswered.</summary>
         OfferExpired,
-        /// <summary>The player dealt with the suspect.</summary>
+        /// <summary>The player dealt with the suspect without an arrest (e.g. let them go).</summary>
         Resolved,
         /// <summary>The suspect got away.</summary>
         SuspectEscaped,
@@ -25,5 +25,7 @@ namespace Callsign.Core.Callouts
         Cancelled,
         /// <summary>The call could not run (e.g. a bad model in the content).</summary>
         Failed,
+        /// <summary>The suspect was arrested and booked at a station.</summary>
+        Arrested,
     }
 }

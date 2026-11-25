@@ -43,8 +43,7 @@ namespace Callsign.Core.Callouts
 
         CalloutSettings Settings => _services.Settings;
 
-        /// <param name="interactPressed">The player pressed the interact key this frame.</param>
-        public void Tick(bool interactPressed)
+        public void Tick(CalloutInput input)
         {
             if (!_duty.OnDuty)
             {
@@ -69,7 +68,7 @@ namespace Callsign.Core.Callouts
                     }
                     break;
                 case Phase.Active:
-                    CalloutEndReason? ended = _scene!.Tick(interactPressed);
+                    CalloutEndReason? ended = _scene!.Tick(input);
                     if (ended != null) Finish(ended.Value);
                     break;
             }

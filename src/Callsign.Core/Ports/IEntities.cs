@@ -29,6 +29,29 @@ namespace Callsign.Core.Ports
 
         /// <summary>Attacks the player.</summary>
         void FightPlayer();
+
+        /// <summary>Stunned, or hurt enough that they stop fighting or running.</summary>
+        bool IsSubdued { get; }
+
+        // Arrest. A cuffed ped keeps their cuffs through the orders below.
+
+        /// <summary>
+        /// Takes their weapons and cuffs them. Never blocks: returns false while the animation is
+        /// still loading; call again next tick. True once cuffed (or if the ped is gone).
+        /// </summary>
+        bool TryCuff();
+
+        /// <summary>Walks just behind the player.</summary>
+        void FollowPlayer();
+
+        /// <summary>
+        /// Gets into a free back seat of the player's current (or last) vehicle.
+        /// <paramref name="warp"/> puts them in at once. False if there is no such seat.
+        /// </summary>
+        bool EnterPlayerVehicle(bool warp);
+
+        /// <summary>Sitting in the player's current (or last) vehicle.</summary>
+        bool InPlayerVehicle { get; }
     }
 
     /// <summary>A vehicle we spawned. All members are safe to use after the vehicle is gone.</summary>
@@ -53,6 +76,8 @@ namespace Callsign.Core.Ports
         Yellow,
         /// <summary>A suspect.</summary>
         Red,
+        /// <summary>A prisoner, or a police place.</summary>
+        Blue,
     }
 
     /// <summary>

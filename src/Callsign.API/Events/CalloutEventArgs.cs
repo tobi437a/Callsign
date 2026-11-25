@@ -30,7 +30,7 @@ namespace Callsign.API.Events
         Declined,
         /// <summary>The offer timed out unanswered.</summary>
         OfferExpired,
-        /// <summary>The player dealt with the suspect.</summary>
+        /// <summary>The player dealt with the suspect without an arrest (e.g. let them go).</summary>
         Resolved,
         /// <summary>The suspect got away.</summary>
         SuspectEscaped,
@@ -40,5 +40,7 @@ namespace Callsign.API.Events
         Cancelled,
         /// <summary>The call could not run (e.g. an unknown ped model in a part).</summary>
         Failed,
+        /// <summary>The suspect was arrested and booked at a station. Since API 0.3.</summary>
+        Arrested,
     }
 }

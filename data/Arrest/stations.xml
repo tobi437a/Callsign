@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Police stations prisoners are taken to. The nearest one is picked when the prisoner is seated;
+  driving within 30 m of its position books them. Positions only need to be near the building.
+-->
+<Stations>
+  <Station id="mission-row"    name="Mission Row Police Station"     x="441"   y="-985"  z="30" />
+  <Station id="vespucci"       name="Vespucci Police Station"        x="-1108" y="-845"  z="19" />
+  <Station id="davis"          name="Davis Sheriff's Station"        x="361"   y="-1584" z="29" />
+  <Station id="la-mesa"        name="La Mesa Police Station"         x="827"   y="-1290" z="28" />
+  <Station id="vinewood"       name="Vinewood Police Station"        x="638"   y="2"     z="83" />
+  <Station id="rockford-hills" name="Rockford Hills Police Station"  x="-561"  y="-132"  z="38" />
+  <Station id="sandy-shores"   name="Sandy Shores Sheriff's Office"  x="1853"  y="3687"  z="34" />
+  <Station id="paleto-bay"     name="Paleto Bay Sheriff's Office"    x="-448"  y="6008"  z="32" />
+</Stations>

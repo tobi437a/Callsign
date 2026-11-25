@@ -38,12 +38,16 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 |---|---|
 | `F7` | Go on / off duty. While on duty you can't get a wanted level, the game's own police are switched off, and story phone calls, texts and random events wait until you go off duty. |
 | `Y` / `N` | Accept / decline the call dispatch is offering. |
-| `E` | Deal with the suspect (on foot, standing next to them). |
+| `E` | Arrest the suspect (on foot, standing next to them). |
+| `H` | Let the suspect go with a warning. |
 | `End` | Call off the current callout. |
 | `F9` | Ask dispatch for a call right now. |
 
 While on duty, dispatch offers a call every minute or two. Accept it, follow the yellow route,
-and find the suspect: they might cooperate, run, or fight.
+and find the suspect: they might cooperate, run, or fight. Runners give up when you catch them on
+foot; fighters give up once stunned or hurt. Arrested suspects follow you in cuffs: walk them to
+your car and get in, they take a back seat. Then drive them to the police station marked on the map
+to book them.
 
 ### Uninstalling
 Delete `Callsign.dll` and `Callsign.API.dll` from `scripts\`, and the `Callsign\` folder.
