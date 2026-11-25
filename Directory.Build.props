@@ -1,0 +1,9 @@
+<Project>
+  <!-- Shared by every project. Modern C# compiled down to what SHVDN's .NET 4.8 runtime can load. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

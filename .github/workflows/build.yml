@@ -1,0 +1,26 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Build and test
+        shell: pwsh
+        run: ./build.ps1
+      - name: Upload mod
+        uses: actions/upload-artifact@v7
+        with:
+          name: Callsign
+          path: |
+            src/Callsign/bin/Release/net48/Callsign.dll
+            src/Callsign/bin/Release/net48/Callsign.API.dll
+            src/Callsign/bin/Release/net48/Callsign.API.xml

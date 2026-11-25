@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+_installed/
+
+# Private dev notes for Claude Code, not published
+CLAUDE.md

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/ExamplePlugin/ExamplePlugin.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Callsign.API/Callsign.API.csproj" />
+    <Project Path="src/Callsign.Core/Callsign.Core.csproj" />
+    <Project Path="src/Callsign/Callsign.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Callsign.Core.Tests/Callsign.Core.Tests.csproj" />
+  </Folder>
+</Solution>

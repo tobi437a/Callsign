@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The single DLL SHVDN loads from GTA V\scripts\. Contains the game adapters,
+    feature modules and the bootstrap Script, plus Callsign.Core's sources
+    compiled in (one deployable file; SHVDN would otherwise scan the Core DLL too).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>Callsign</AssemblyName>
+    <RootNamespace>Callsign</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Callsign.Core\**\*.cs" Exclude="..\Callsign.Core\obj\**;..\Callsign.Core\bin\**" LinkBase="Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Public plugin API: a separate DLL (deployed next to Callsign.dll) that plugins reference. -->
+    <ProjectReference Include="..\Callsign.API\Callsign.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Provided by the game folder at runtime: never copy it next to our DLL. -->
+    <Reference Include="ScriptHookVDotNet3">
+      <HintPath>..\..\lib\ScriptHookVDotNet3.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+</Project>

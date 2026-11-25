@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pure domain logic: incident generation, director, suspect model, career rules.
+    Deliberately has NO reference to ScriptHookVDotNet, so it cannot touch the game
+    and can be unit-tested outside it. The game DLL compiles these same sources in
+    (see ..\Callsign\Callsign.csproj), so only one DLL is deployed.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Callsign.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
