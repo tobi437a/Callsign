@@ -19,11 +19,17 @@ namespace Callsign.Core.Callouts
 
         /// <summary>Free-form labels situations filter on, e.g. "store", "county", "armed".</summary>
         IReadOnlyList<string> Tags { get; }
+
+        /// <summary>Throws <see cref="ArgumentException"/> if the part can't work (missing name, no models, ...).</summary>
+        void Validate();
     }
 
     /// <summary>Where an incident happens.</summary>
     public sealed record LocationPart(string Id, string Name, Position Position, IReadOnlyList<string> Tags, double Weight = 1)
-        : ICalloutPart;
+        : ICalloutPart
+    {
+        public void Validate() => Require.Text(Name, "name");
+    }
 
     /// <summary>
     /// What is going on: the call's title, the dispatch line, and which other parts fit it.
@@ -45,6 +51,12 @@ namespace Callsign.Core.Callouts
         public bool Fits(LocationPart location) => TagMatch.Any(LocationTags, location.Tags);
         public bool Fits(SuspectPart suspect) => TagMatch.Any(SuspectTags, suspect.Tags);
         public bool Fits(OutcomePart outcome) => TagMatch.Any(OutcomeTags, outcome.Tags);
+
+        public void Validate()
+        {
+            Require.Text(Title, "title");
+            Require.Text(Dispatch, "dispatch text");
+        }
     }
 
     /// <summary>Who the suspect is.</summary>
@@ -57,11 +69,24 @@ namespace Callsign.Core.Callouts
         IReadOnlyList<string> Models,
         string? Weapon,
         IReadOnlyList<string> Tags,
-        double Weight = 1) : ICalloutPart;
+        double Weight = 1) : ICalloutPart
+    {
+        public void Validate()
+        {
+            Require.Text(Description, "description");
+            if (Models == null || Models.Count == 0) throw new ArgumentException("needs at least one model");
+        }
+    }
 
     /// <summary>How the suspect reacts once the officer shows up.</summary>
     public sealed record OutcomePart(string Id, SuspectBehaviour Behaviour, IReadOnlyList<string> Tags, double Weight = 1)
-        : ICalloutPart;
+        : ICalloutPart
+    {
+        public void Validate()
+        {
+            if (!Enum.IsDefined(typeof(SuspectBehaviour), Behaviour)) throw new ArgumentException("unknown behaviour " + Behaviour);
+        }
+    }
 
     /// <summary>The suspect's reaction when the officer arrives.</summary>
     public enum SuspectBehaviour
@@ -72,6 +97,14 @@ namespace Callsign.Core.Callouts
         Flee,
         /// <summary>Attacks the officer.</summary>
         Fight,
+    }
+
+    internal static class Require
+    {
+        public static void Text(string? value, string what)
+        {
+            if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("missing " + what);
+        }
     }
 
     internal static class TagMatch

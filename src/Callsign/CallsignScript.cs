@@ -48,7 +48,7 @@ namespace Callsign
             // --- modules, in tick order (plugins last) ---
             _modules.Add(new DutyModule(duty, bus, _input));
             _modules.Add(new CalloutsModule(callouts, _input));
-            _modules.Add(new PluginsModule(paths.Plugins, duty, bus, _log));
+            _modules.Add(new PluginsModule(paths.Plugins, duty, parts, callouts, bus, _log));
 
             foreach (IModule m in _modules)
                 Run(m, "Start", m.Start);

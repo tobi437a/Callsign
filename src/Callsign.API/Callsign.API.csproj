@@ -8,7 +8,7 @@
     <TargetFramework>net48</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
     <RootNamespace>Callsign.API</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <!-- Not strong-named, so the CLR ignores this when binding; kept fixed anyway. -->
     <AssemblyVersion>0.0.0.0</AssemblyVersion>
     <!-- The real API version (read by the mod at runtime). Must be set explicitly, or the SDK copies AssemblyVersion. -->
