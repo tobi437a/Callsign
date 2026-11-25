@@ -20,6 +20,7 @@ namespace Callsign.Core.Callouts
         IWorld World,
         INotifier Notifier,
         IClock Clock,
+        IRandom Random,
         ILog Log,
         CalloutSettings Settings,
         SuspectProfileGenerator Profiles,
@@ -47,7 +48,19 @@ namespace Callsign.Core.Callouts
     {
         public enum Stage { EnRoute, Spawning, Active, Ended }
 
-        public enum VehicleStage { None, Cruising, PullingOver, Stopped, Pursuit, Abandoned }
+        public enum VehicleStage
+        {
+            None,
+            Cruising,
+            /// <summary>A calm driver pulling over for the player's lights.</summary>
+            PullingOver,
+            /// <summary>Pulled over; the occupants wait for the officer.</summary>
+            Stopped,
+            Pursuit,
+            /// <summary>The fleeing driver has had enough and is stopping, to give up or to run.</summary>
+            Stopping,
+            Abandoned,
+        }
 
         public const string PullOverHelp = "Turn on your emergency lights to pull the ~r~vehicle~s~ over.";
 
@@ -60,6 +73,10 @@ namespace Callsign.Core.Callouts
         IBlip? _areaBlip;
         IVehicle? _vehicle;
         long _slowSince = -1;
+        long _lastTickMs = -1;
+        long _stoppingSince;
+        PursuitMind? _mind;
+        bool _givingUp;
         SceneSuspect? _focus;
         SceneSuspect? _lastFinished;
 
@@ -212,8 +229,54 @@ namespace Callsign.Core.Callouts
                         Vehicle = VehicleStage.Abandoned;
                         return;
                     }
-                    if (ShouldBail()) BailOut();
+                    if (ShouldBail())
+                    {
+                        BailOut();
+                        return;
+                    }
+                    PursuitChoice choice = _mind!.Update(Pressure(distance), SecondsSinceLastTick());
+                    if (choice != PursuitChoice.KeepGoing) StartStopping(choice == PursuitChoice.GiveUp);
                     return;
+
+                case VehicleStage.Stopping:
+                    bool slow = _vehicle.Speed <= settings.GetOutSpeed || _vehicle.IsWrecked || !Driver.Ped.InVehicle;
+                    if (!slow && _s.Clock.NowMs - _stoppingSince < settings.StopTimeoutMs) return;
+                    if (_givingUp) GiveUp();
+                    else BailOut();
+                    return;
+            }
+        }
+
+        PursuitPressure Pressure(float distance) => new PursuitPressure(
+            _vehicle!.BurstTyres, _vehicle.EngineHealth, _vehicle.Speed, distance, Driver.Ped.PlayerAimingAt);
+
+        double SecondsSinceLastTick()
+        {
+            long now = _s.Clock.NowMs;
+            double seconds = _lastTickMs < 0 ? 0 : (now - _lastTickMs) / 1000.0;
+            _lastTickMs = now;
+            return seconds;
+        }
+
+        void StartStopping(bool giveUp)
+        {
+            Vehicle = VehicleStage.Stopping;
+            _givingUp = giveUp;
+            _stoppingSince = _s.Clock.NowMs;
+            Driver.Ped.PullOver();
+            _s.Log.Info("Pursuit: driver " + (giveUp ? "gives up" : "bails") + " after pressure " + _mind!.Pressure.ToString("0.00"));
+            if (giveUp) _s.Notifier.Notify("The vehicle is ~g~pulling over~s~.");
+        }
+
+        /// <summary>The fleeing driver gives up; passengers still decide for themselves.</summary>
+        void GiveUp()
+        {
+            Vehicle = VehicleStage.Abandoned;
+            _s.Notifier.Notify("The driver ~g~gives up~s~.");
+            foreach (SceneSuspect x in Seated.ToList())
+            {
+                if (x.IsDriver) x.GiveUp();
+                else x.BailOut();
             }
         }
 
@@ -221,6 +284,9 @@ namespace Callsign.Core.Callouts
         {
             Vehicle = VehicleStage.Pursuit;
             _slowSince = -1;
+            _lastTickMs = -1;
+            _mind = new PursuitMind(Driver.Interaction.Profile, Driver.Behaviour, _s.Random, _s.Settings.Pursuit);
+            _s.Log.Info("Pursuit: driver resolve " + _mind.Resolve.ToString("0.00") + (_mind.Runner ? ", runs" : ", gives up") + " when broken");
             foreach (SceneSuspect x in _suspects) x.Reseat();   // a stopped car driving off takes its passengers along
             Driver.Ped.DriveAway();
             Driver.ShowBlip("Suspect vehicle", MarkerColor.Red, route: true);

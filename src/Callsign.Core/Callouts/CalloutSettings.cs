@@ -33,5 +33,11 @@ namespace Callsign.Core.Callouts
         public float StoppedSpeed { get; set; } = 1.5f;
         /// <summary>A fleeing vehicle that has stood still this long is abandoned: everyone bails out.</summary>
         public long BailAfterStoppedMs { get; set; } = 2_500;
+        /// <summary>A driver who has decided to stop gets out once slower than this (m/s), or after <see cref="StopTimeoutMs"/>.</summary>
+        public float GetOutSpeed { get; set; } = 3;
+        public long StopTimeoutMs { get; set; } = 8_000;
+
+        /// <summary>How fleeing drivers wear down and give up.</summary>
+        public PursuitSettings Pursuit { get; set; } = new PursuitSettings();
     }
 }

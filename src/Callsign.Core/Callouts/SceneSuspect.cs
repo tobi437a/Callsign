@@ -94,6 +94,13 @@ namespace Callsign.Core.Callouts
             else Engage();
         }
 
+        /// <summary>The driver stops running and gives up, whatever they rolled.</summary>
+        public void GiveUp()
+        {
+            Behaviour = SuspectBehaviour.Comply;
+            Surrender(announce: false);
+        }
+
         /// <summary>The vehicle drives off with them in it: the scene handles them again.</summary>
         public void Reseat()
         {

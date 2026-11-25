@@ -144,3 +144,24 @@ public class MenuTests
         Assert.Null(menu.Handle(new MenuInput(Select: true)));
     }
 }
+
+public class DialogueContextTests
+{
+    [Fact]
+    public void DriversAndPedestriansGetTheirOwnLines()
+    {
+        var content = new SuspectContent();
+        content.Lines.Add(new DialogueLine(DialogueTopic.Purpose, SuspectTraits.None, "walking", DialogueContext.OnFoot));
+        content.Lines.Add(new DialogueLine(DialogueTopic.Purpose, SuspectTraits.None, "driving", DialogueContext.InVehicle));
+        content.Lines.Add(new DialogueLine(DialogueTopic.Purpose, SuspectTraits.None, "either"));
+        var random = new SeededRandom(1);
+        var dialogue = new Dialogue(content, random);
+        SuspectProfile suspect = new SuspectProfileGenerator(content, random).Generate(true, [], false);
+
+        var onFoot = Enumerable.Range(0, 40).Select(_ => dialogue.Say(DialogueTopic.Purpose, suspect, DialogueContext.OnFoot)).ToHashSet();
+        var driving = Enumerable.Range(0, 40).Select(_ => dialogue.Say(DialogueTopic.Purpose, suspect, DialogueContext.InVehicle)).ToHashSet();
+
+        Assert.Equal(["either", "walking"], onFoot.Order());
+        Assert.Equal(["driving", "either"], driving.Order());
+    }
+}

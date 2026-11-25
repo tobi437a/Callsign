@@ -109,6 +109,18 @@ namespace Callsign.Engine
 
         public bool InVehicle => Ped.Exists() && Ped.IsInVehicle();
 
+        public bool PlayerAimingAt
+        {
+            get
+            {
+                if (!Ped.Exists()) return false;
+                Player player = Game.Player;
+                if (player.IsTargeting(Ped)) return true;
+                Vehicle? vehicle = Ped.CurrentVehicle;
+                return vehicle != null && vehicle.Exists() && player.IsTargeting(vehicle);
+            }
+        }
+
         public void WarpInto(IVehicle vehicle, int seat)
         {
             Vehicle v = ((GameVehicle)vehicle).Vehicle;
@@ -295,6 +307,21 @@ namespace Callsign.Engine
         public Position Position => Vehicle.Position.ToPosition();
         public float Speed => Vehicle.Exists() ? Vehicle.Speed : 0f;
         public bool IsWrecked => !Vehicle.Exists() || Vehicle.IsDead || !Vehicle.IsDriveable;
+
+        // Wheel ids 0..5: front, middle (6-wheelers) and rear pairs.
+        public int BurstTyres
+        {
+            get
+            {
+                if (!Vehicle.Exists()) return 0;
+                int burst = 0;
+                for (int wheel = 0; wheel <= 5; wheel++)
+                    if (Function.Call<bool>(Hash.IS_VEHICLE_TYRE_BURST, Vehicle, wheel, false)) burst++;
+                return burst;
+            }
+        }
+
+        public float EngineHealth => Vehicle.Exists() ? Math.Max(0f, Math.Min(1f, Vehicle.EngineHealth / 1000f)) : 0f;
 
         public void Release(ReleaseMode mode) => GamePed.ReleaseEntity(Vehicle, mode);
     }

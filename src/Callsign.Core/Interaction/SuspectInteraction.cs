@@ -73,7 +73,7 @@ namespace Callsign.Core.Interaction
 
         // Menu item ids.
         public const string AskId = "id", AskPurpose = "purpose", AskDrinking = "drinking", RunName = "records",
-            BreathTest = "breath", DrugSwab = "drugs", Search = "search", Arrest = "arrest", LetGo = "release";
+            BreathTest = "breath", DrugSwab = "drugs", StepOut = "stepout", Search = "search", Arrest = "arrest", LetGo = "release";
 
         enum Check { None, Records, Breath, Drugs }
 
@@ -87,6 +87,7 @@ namespace Callsign.Core.Interaction
         string? _recordsResult, _breathResult, _drugResult;
         Check _pending;
         long _pendingDoneAt;
+        DialogueContext _context = DialogueContext.OnFoot;
 
         public SuspectInteraction(IPed suspect, SuspectProfile profile, InteractionServices services)
         {
@@ -135,7 +136,8 @@ namespace Callsign.Core.Interaction
                 // The player left them standing: they go on their way.
                 Stopped = false;
                 _menuOpen = false;
-                _suspect.Wander();
+                if (_suspect.InVehicle) _suspect.DriveAround();
+                else _suspect.Wander();
                 return null;
             }
 
@@ -173,8 +175,10 @@ namespace Callsign.Core.Interaction
                 return Close(InteractionOutcome.Fled);
             }
             Stopped = true;
-            _suspect.FacePlayer();
-            Say(_s.Dialogue.Say(DialogueTopic.Stopped, _profile));
+            // A driver stays at the wheel and talks through the window until told to step out.
+            _context = _suspect.InVehicle ? DialogueContext.InVehicle : DialogueContext.OnFoot;
+            if (!_suspect.InVehicle) _suspect.FacePlayer();
+            Say(_s.Dialogue.Say(DialogueTopic.Stopped, _profile, _context));
             return null;
         }
 
@@ -194,7 +198,9 @@ namespace Callsign.Core.Interaction
             yield return new MenuItem(DrugSwab,
                 _drugResult ?? (_pending == Check.Drugs ? "Drug swab: waiting for result..." : kitNear ? "Drug swab (kit from your vehicle)" : "Drug swab (your vehicle must be nearby)"),
                 _drugResult == null && !busy && kitNear);
-            yield return new MenuItem(Search, "Pat down");
+            bool seated = _suspect.InVehicle;
+            if (seated) yield return new MenuItem(StepOut, "Order them out of the vehicle");
+            yield return new MenuItem(Search, seated ? "Pat down (order them out first)" : "Pat down", !seated);
             yield return new MenuItem(Arrest, "~r~Arrest~s~");
             yield return new MenuItem(LetGo, "~g~Let them go~s~");
         }
@@ -210,23 +216,23 @@ namespace Callsign.Core.Interaction
                 case AskId:
                     if (_profile.Has(SuspectTraits.NoId))
                     {
-                        Say(_s.Dialogue.Say(DialogueTopic.NoId, _profile));
+                        Say(_s.Dialogue.Say(DialogueTopic.NoId, _profile, _context));
                         _knownName = _profile.Stated;
                     }
                     else
                     {
-                        Say(_s.Dialogue.Say(DialogueTopic.HandsId, _profile));
+                        Say(_s.Dialogue.Say(DialogueTopic.HandsId, _profile, _context));
                         _knownName = _profile.Real;
                         _s.Notifier.Notify("~b~ID card~s~~n~" + _profile.Real.FullName + "~n~Age " + _profile.Real.Age);
                     }
                     return null;
 
                 case AskPurpose:
-                    Say(_s.Dialogue.Say(DialogueTopic.Purpose, _profile));
+                    Say(_s.Dialogue.Say(DialogueTopic.Purpose, _profile, _context));
                     return null;
 
                 case AskDrinking:
-                    Say(_s.Dialogue.Say(DialogueTopic.Drinking, _profile));
+                    Say(_s.Dialogue.Say(DialogueTopic.Drinking, _profile, _context));
                     return null;
 
                 case RunName:
@@ -245,6 +251,11 @@ namespace Callsign.Core.Interaction
                 case DrugSwab:
                     _s.Notifier.Subtitle("You take a swab from the suspect's mouth...", (int)_s.Settings.DrugSwabMs);
                     StartCheck(Check.Drugs, _s.Settings.DrugSwabMs);
+                    return null;
+
+                case StepOut:
+                    _suspect.FacePlayer();   // gets out first
+                    Say(_s.Dialogue.Say(DialogueTopic.StepOut, _profile, _context));
                     return null;
 
                 case Search:

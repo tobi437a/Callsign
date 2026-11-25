@@ -41,6 +41,9 @@ namespace Callsign.Core.Ports
 
         // Vehicles. The driving orders do nothing unless the ped is driving.
 
+        /// <summary>The player is aiming a weapon at this ped, or at the vehicle they are in.</summary>
+        bool PlayerAimingAt { get; }
+
         /// <summary>Sitting in a vehicle (any vehicle).</summary>
         bool InVehicle { get; }
 
@@ -91,6 +94,12 @@ namespace Callsign.Core.Ports
 
         /// <summary>Destroyed or no longer drivable.</summary>
         bool IsWrecked { get; }
+
+        /// <summary>How many tyres are burst (shot out, spiked).</summary>
+        int BurstTyres { get; }
+
+        /// <summary>0 = dead engine, 1 = undamaged.</summary>
+        float EngineHealth { get; }
     }
 
     /// <summary>A map marker we created.</summary>

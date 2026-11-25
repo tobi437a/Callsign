@@ -59,7 +59,7 @@ namespace Callsign
             var interaction = new InteractionServices(world, notifier, new GameMenuView(), clock, random,
                 new Dialogue(suspectContent, random), new InteractionSettings());
             var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameVehicleFactory(), blips,
-                world, notifier, clock, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
+                world, notifier, clock, random, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
                 interaction, custody);
             var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
 

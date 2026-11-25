@@ -66,6 +66,7 @@ sealed class FakePed(Position at) : IPed
     void OnFoot(string order) { Order = order; InVehicle = false; }   // on-foot orders get them out first
 
     public bool InVehicle { get; set; }
+    public bool PlayerAimingAt { get; set; }
     public int Seat { get; private set; } = -1;
     public void WarpInto(IVehicle vehicle, int seat) { InVehicle = true; Seat = seat; }
     public void DriveAround() { if (Seat == 0 && InVehicle) Order = "drive"; }
@@ -122,6 +123,8 @@ sealed class FakeVehicle(Position at) : IVehicle
     public Position Position { get; set; } = at;
     public float Speed { get; set; } = 15;
     public bool IsWrecked { get; set; }
+    public int BurstTyres { get; set; }
+    public float EngineHealth { get; set; } = 1;
     public ReleaseMode? Released { get; private set; }
     public void Release(ReleaseMode mode) => Released = mode;
 }
@@ -223,7 +226,7 @@ public class CalloutServiceTests
         var content = new SuspectContent();
         var interaction = new InteractionServices(_world, _notifier, _menu, _clock, random, new Dialogue(content, random),
             new InteractionSettings());
-        var services = new CalloutSceneServices(_scopes, _peds, _vehicles, _blips, _world, _notifier, _clock, _log, _settings,
+        var services = new CalloutSceneServices(_scopes, _peds, _vehicles, _blips, _world, _notifier, _clock, random, _log, _settings,
             new SuspectProfileGenerator(content, random, noTraits), interaction, custody);
         _service = new CalloutService(new IncidentGenerator(_parts, random), _duty, _bus, _clock, random, services);
     }
@@ -584,6 +587,9 @@ public class CalloutServiceTests
 
         PlayerOnFootAt(driver.Position, 2);
         OpenMenu(driver);
+        Assert.True(driver.InVehicle);   // talks through the window
+        Assert.False(_menu.Last!.Items.Single(i => i.Id == SuspectInteraction.Search).Enabled);
+        Choose(SuspectInteraction.StepOut);
         Assert.Equal("face", driver.Order);
         Assert.False(driver.InVehicle);
         Choose(SuspectInteraction.LetGo);
@@ -614,6 +620,29 @@ public class CalloutServiceTests
         PlayerOnFootAt(driver.Position, 1);
         Tick();
         Assert.Equal("handsup", driver.Order);
+    }
+
+    [Fact]
+    public void FleeingDriverWearsDownUnderPressureAndStops()
+    {
+        UseCall(SuspectBehaviour.Flee, vehicle: true);
+        FakePed driver = StartAndSpawn(1)[0];
+        FakeVehicle car = _vehicles.Last!;
+        PlayerInCarAt(car.Position, 20);
+        Tick();
+        Assert.Equal("driveaway", driver.Order);
+
+        // All four tyres shot out, engine smoking, a gun on them: even the most determined driver breaks.
+        car.BurstTyres = 4;
+        car.EngineHealth = 0.1f;
+        driver.PlayerAimingAt = true;
+        for (int i = 0; i < 60 && driver.Order == "driveaway"; i++) Advance(1000);
+        Assert.Equal("pullover", driver.Order);
+
+        car.Speed = 1;
+        Tick();
+        Assert.False(driver.InVehicle);
+        Assert.Contains(driver.Order, new[] { "handsup", "flee" });   // gave up, or bailed and ran
     }
 
     [Fact]
@@ -695,9 +724,11 @@ public class BuiltInContentTests
 
         Assert.Empty(log.Problems);
         Assert.True(added > 0);
+        // At runtime a street near the player is always a candidate too.
+        var street = new LocationPart("street", "Some St", default, ["street", "public"]);
         foreach (var s in parts.Situations.All)
         {
-            Assert.Contains(parts.Locations.All, s.Fits);
+            Assert.Contains(parts.Locations.All.Append(street), s.Fits);
             Assert.Contains(parts.Suspects.All, s.Fits);
             Assert.Contains(parts.Outcomes.All, s.Fits);
         }

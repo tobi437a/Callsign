@@ -1,5 +1,6 @@
 using Callsign.Core.Callouts;
 using Callsign.Core.Ports;
+using Callsign.Core.Suspects;
 using Callsign.Core.World;
 using Xunit;
 
@@ -261,5 +262,55 @@ public class CalloutContentLoaderTests
 
         Assert.Equal(0, CalloutContentLoader.Load(new StringReader("<CalloutContent><oops"), "bad.xml", new CalloutParts(), log));
         Assert.Single(log.Errors);
+    }
+}
+
+public class PursuitMindTests
+{
+    static readonly SuspectProfile Plain = new SuspectProfileGenerator(new SuspectContent(), new SeededRandom(1),
+        new TraitChances { Warrant = 0, FalseNameOtherwise = 0, NoId = 0, Intoxicated = 0, HadADrink = 0,
+            OnDrugs = 0, CarryingDrugs = 0, ConcealedWeapon = 0, NervousOtherwise = 0 }).Generate(true, [], false);
+
+    static double SecondsToBreak(PursuitMind mind, PursuitPressure pressure)
+    {
+        for (int s = 1; s <= 3600; s++)
+            if (mind.Update(pressure, 1) != PursuitChoice.KeepGoing) return s;
+        return double.PositiveInfinity;
+    }
+
+    static List<PursuitMind> Drivers(int n)
+    {
+        var random = new SeededRandom(11);
+        return Enumerable.Range(0, n).Select(_ => new PursuitMind(Plain, SuspectBehaviour.Flee, random, new PursuitSettings())).ToList();
+    }
+
+    [Fact]
+    public void SomeFoldQuicklyOthersAlmostNeverStop()
+    {
+        var chase = new PursuitPressure(0, 1, 30, 20, false);   // clean chase, player right behind
+        var times = Drivers(200).Select(m => SecondsToBreak(m, chase)).ToList();
+        Assert.Contains(times, t => t < 45);
+        Assert.Contains(times, t => t > 150);
+    }
+
+    [Fact]
+    public void ShotOutTyresAndAGunWearThemDownMuchFaster()
+    {
+        var clean = new PursuitPressure(0, 1, 30, 20, false);
+        var crippled = new PursuitPressure(3, 0.4f, 10, 20, true);
+        // Same seed, so the same 50 drivers both times.
+        var cleanTimes = Drivers(50).Select(m => SecondsToBreak(m, clean)).ToList();
+        var crippledTimes = Drivers(50).Select(m => SecondsToBreak(m, crippled)).ToList();
+        Assert.All(crippledTimes, t => Assert.True(t < 30));
+        Assert.True(cleanTimes.Average() > 3 * crippledTimes.Average());
+    }
+
+    [Fact]
+    public void SecretsAndViolenceMakeThemMoreDetermined()
+    {
+        var violent = new PursuitMind(Plain, SuspectBehaviour.Fight, new SeededRandom(4), new PursuitSettings());
+        var calm = new PursuitMind(Plain, SuspectBehaviour.Flee, new SeededRandom(4), new PursuitSettings());
+        Assert.True(violent.Resolve > calm.Resolve);
+        Assert.True(violent.Runner);
     }
 }

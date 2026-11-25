@@ -3,8 +3,9 @@
   What suspects are made of: names, warrants, pocket contents, hidden weapons and dialogue.
   Lists are comma-separated. Every file in this folder adds to the lists.
 
-  Dialogue: <Line topic="..." trait="...">. Topics: Stopped, Purpose, Drinking, HandsId, NoId.
+  Dialogue: <Line topic="..." trait="...">. Topics: Stopped, Purpose, Drinking, HandsId, NoId, StepOut.
   A line with a trait is only said by suspects with that trait, and they prefer such lines.
+  context="foot" / context="vehicle": only said by suspects stopped on foot / at the wheel (default: both).
   Traits: Warrant, FalseName, NoId, Intoxicated, OnDrugs, CarryingDrugs, ConcealedWeapon, Nervous.
   {name} = the name the suspect gives.
 
@@ -35,17 +36,29 @@
   <Line topic="Stopped" trait="Nervous">Is there a problem? I'm kind of in a hurry.</Line>
   <Line topic="Stopped" trait="Intoxicated">Whoa, hey... offisher. Evening.</Line>
   <Line topic="Stopped" trait="OnDrugs">Man, your lights are... really bright.</Line>
+  <Line topic="Stopped" context="vehicle">Was I speeding, officer?</Line>
+  <Line topic="Stopped" context="vehicle">Is there a problem? I was doing the limit.</Line>
+  <Line topic="Stopped" context="vehicle">Evening, officer. What did I do?</Line>
+  <Line topic="Stopped" context="vehicle" trait="Nervous">Wh-why'd you pull me over? I didn't do anything.</Line>
+  <Line topic="Stopped" context="vehicle" trait="Intoxicated">Offisher! I was jusht... driving. Very carefully.</Line>
 
   <!-- Purpose -->
-  <Line topic="Purpose">Just walking home.</Line>
-  <Line topic="Purpose">Waiting for a friend. She's late, as usual.</Line>
-  <Line topic="Purpose">Getting some air. Is that illegal now?</Line>
-  <Line topic="Purpose">I live around here.</Line>
-  <Line topic="Purpose" trait="Nervous">Nothing! Just... going to the store. Why?</Line>
-  <Line topic="Purpose" trait="Nervous">I was just leaving, okay? I'm leaving.</Line>
+  <Line topic="Purpose" context="foot">Just walking home.</Line>
+  <Line topic="Purpose" context="foot">Waiting for a friend. She's late, as usual.</Line>
+  <Line topic="Purpose" context="foot">Getting some air. Is that illegal now?</Line>
+  <Line topic="Purpose" context="foot">I live around here.</Line>
+  <Line topic="Purpose" trait="Nervous" context="foot">Nothing! Just... going to the store. Why?</Line>
+  <Line topic="Purpose" trait="Nervous" context="foot">I was just leaving, okay? I'm leaving.</Line>
   <Line topic="Purpose" trait="Warrant">Look, I'm just passing through. I'm not from around here.</Line>
-  <Line topic="Purpose" trait="Intoxicated">Party's... that way. Or that way. I'm going home. Probably.</Line>
-  <Line topic="Purpose" trait="OnDrugs">I'm just vibing, officer. Just vibing.</Line>
+  <Line topic="Purpose" trait="Intoxicated" context="foot">Party's... that way. Or that way. I'm going home. Probably.</Line>
+  <Line topic="Purpose" trait="OnDrugs" context="foot">I'm just vibing, officer. Just vibing.</Line>
+  <Line topic="Purpose" context="vehicle">Heading home from work.</Line>
+  <Line topic="Purpose" context="vehicle">On my way to pick up some food.</Line>
+  <Line topic="Purpose" context="vehicle">Driving to my sister's place. She lives just up the road.</Line>
+  <Line topic="Purpose" context="vehicle" trait="Nervous">Just driving! Can I go now? I'm late.</Line>
+  <Line topic="Purpose" context="vehicle" trait="Warrant">Just passing through. I'm on my way out of town.</Line>
+  <Line topic="Purpose" context="vehicle" trait="Intoxicated">Going home. Taking the... the scenic route.</Line>
+  <Line topic="Purpose" context="vehicle" trait="OnDrugs">Just cruising, man. The road's all wavy tonight.</Line>
 
   <!-- Drinking -->
   <Line topic="Drinking">No, sir. Not a drop.</Line>
@@ -53,21 +66,34 @@
   <Line topic="Drinking">One beer with dinner, hours ago.</Line>
   <Line topic="Drinking" trait="Intoxicated">Maybe a couple beers. Like... two. Three.</Line>
   <Line topic="Drinking" trait="Intoxicated">Define "drinking".</Line>
-  <Line topic="Drinking" trait="Intoxicated">I'm fine! I'm totally fine. I'm walking, not driving.</Line>
+  <Line topic="Drinking" trait="Intoxicated" context="foot">I'm fine! I'm totally fine. I'm walking, not driving.</Line>
+  <Line topic="Drinking" trait="Intoxicated" context="vehicle">Just a couple. I'm good to drive, I swear.</Line>
+  <Line topic="Drinking" trait="Intoxicated" context="vehicle">I only had one! Okay, a few. But I'm driving fine.</Line>
+  <Line topic="Drinking" context="vehicle">No, sir. I never drink and drive.</Line>
   <Line topic="Drinking" trait="OnDrugs">Nah, nothing. Why's everyone asking me that?</Line>
   <Line topic="Drinking" trait="OnDrugs">Just some... medicine. For my back.</Line>
 
   <!-- HandsId -->
-  <Line topic="HandsId">Sure, here you go.</Line>
+  <Line topic="HandsId" context="foot">Sure, here you go.</Line>
+  <Line topic="HandsId" context="vehicle">Here's my licence. Registration's in the glovebox.</Line>
+  <Line topic="HandsId" context="vehicle">Sure, licence is right here.</Line>
   <Line topic="HandsId">Fine. Here.</Line>
   <Line topic="HandsId">Do you really need it? ...Okay, here.</Line>
   <Line topic="HandsId" trait="Nervous">Y-yeah, hold on. Here.</Line>
 
   <!-- NoId -->
-  <Line topic="NoId">I left my wallet at home. I'm {name}.</Line>
+  <Line topic="NoId" context="foot">I left my wallet at home. I'm {name}.</Line>
   <Line topic="NoId">Don't have it on me. Name's {name}.</Line>
+  <Line topic="NoId" context="vehicle">I left my licence at home. I'm {name}.</Line>
   <Line topic="NoId" trait="FalseName">I, uh, lost it. It's {name}.</Line>
   <Line topic="NoId" trait="FalseName">Someone stole my wallet. I'm {name}, you can check.</Line>
   <Line topic="NoId" trait="Intoxicated">My ID's... somewhere. I'm {name}! Everybody knows me.</Line>
+
+  <!-- StepOut -->
+  <Line topic="StepOut">Okay, okay. I'm getting out.</Line>
+  <Line topic="StepOut">Seriously? Fine.</Line>
+  <Line topic="StepOut">What for? ...Alright.</Line>
+  <Line topic="StepOut" trait="Nervous">Why do I have to get out? Okay... okay.</Line>
+  <Line topic="StepOut" trait="Intoxicated">Hold on, the door's... there we go.</Line>
 
 </SuspectContent>
