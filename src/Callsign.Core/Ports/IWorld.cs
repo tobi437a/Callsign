@@ -16,6 +16,9 @@ namespace Callsign.Core.Ports
 
         bool PlayerDead { get; }
 
+        /// <summary>The player is in a vehicle with its emergency lights on.</summary>
+        bool PlayerLightsOn { get; }
+
         /// <summary>The nearest road position to <paramref name="near"/> and the road's heading there.</summary>
         bool TryFindStreetNear(Position near, out Position position, out float heading);
 

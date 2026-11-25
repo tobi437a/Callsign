@@ -48,14 +48,28 @@ namespace Callsign.Core.Callouts
         IReadOnlyList<string> Tags,
         double Weight = 1) : ICalloutPart
     {
+        /// <summary>Most suspects one incident can have (a vehicle has four seats).</summary>
+        public const int SuspectLimit = 4;
+
+        /// <summary>The suspects are in a vehicle: only suspects that come with vehicles fit, and vice versa.</summary>
+        public bool InVehicle { get; init; }
+
+        /// <summary>Fewest suspects. Each one rolls their own outcome.</summary>
+        public int MinSuspects { get; init; } = 1;
+
+        /// <summary>Most suspects (up to <see cref="SuspectLimit"/>).</summary>
+        public int MaxSuspects { get; init; } = 1;
+
         public bool Fits(LocationPart location) => TagMatch.Any(LocationTags, location.Tags);
-        public bool Fits(SuspectPart suspect) => TagMatch.Any(SuspectTags, suspect.Tags);
+        public bool Fits(SuspectPart suspect) => suspect.InVehicle == InVehicle && TagMatch.Any(SuspectTags, suspect.Tags);
         public bool Fits(OutcomePart outcome) => TagMatch.Any(OutcomeTags, outcome.Tags);
 
         public void Validate()
         {
             Require.Text(Title, "title");
             Require.Text(Dispatch, "dispatch text");
+            if (MinSuspects < 1 || MaxSuspects < MinSuspects || MaxSuspects > SuspectLimit)
+                throw new ArgumentException("suspect count must be 1.." + SuspectLimit + " with min <= max");
         }
     }
 
@@ -71,6 +85,11 @@ namespace Callsign.Core.Callouts
         IReadOnlyList<string> Tags,
         double Weight = 1) : ICalloutPart
     {
+        /// <summary>Vehicle models they drive (one is picked per incident). Empty = on foot.</summary>
+        public IReadOnlyList<string> Vehicles { get; init; } = Array.Empty<string>();
+
+        public bool InVehicle => Vehicles.Count > 0;
+
         public void Validate()
         {
             Require.Text(Description, "description");

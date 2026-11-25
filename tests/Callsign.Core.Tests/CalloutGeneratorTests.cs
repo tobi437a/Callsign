@@ -134,7 +134,69 @@ public class IncidentGeneratorTests
         var a = new IncidentGenerator(parts, new SeededRandom(42)).Generate(Player, 100, 1500);
         var b = new IncidentGenerator(parts, new SeededRandom(42)).Generate(Player, 100, 1500);
 
-        Assert.Equal(a, b);
+        Assert.Equal(a!.Suspects, b!.Suspects);
+        Assert.Equal(a with { Suspects = b.Suspects }, b);
+    }
+
+    [Fact]
+    public void VehicleSituationsOnlyTakeSuspectsWithVehiclesAndViceVersa()
+    {
+        var parts = new CalloutParts();
+        parts.Situations.Add(new SituationPart("car", "Stolen car", "{suspect} at {location}", [], [], [], []) { InVehicle = true });
+        parts.Situations.Add(new SituationPart("foot", "Loiterer", "{suspect} at {location}", [], [], [], []));
+        parts.Locations.Add(new LocationPart("loc", "Test St", new Position(500, 0, 0), []));
+        parts.Suspects.Add(new SuspectPart("walker", "man", ["m"], null, []));
+        parts.Suspects.Add(new SuspectPart("driver", "Karin Sultan", ["m"], null, []) { Vehicles = ["sultan"] });
+        parts.Outcomes.Add(new OutcomePart("ok", SuspectBehaviour.Comply, []));
+        var generator = new IncidentGenerator(parts, new SeededRandom(3));
+
+        for (int i = 0; i < 50; i++)
+        {
+            Incident incident = generator.Generate(Player, 100, 1500)!;
+            if (incident.Situation.Id == "car")
+            {
+                Assert.Equal("driver", incident.Suspect.Id);
+                Assert.Equal("sultan", incident.VehicleModel);
+            }
+            else
+            {
+                Assert.Equal("walker", incident.Suspect.Id);
+                Assert.Null(incident.VehicleModel);
+            }
+        }
+    }
+
+    [Fact]
+    public void RollsTheSuspectCountAndAnOutcomeForEachSuspect()
+    {
+        var parts = new CalloutParts();
+        parts.Situations.Add(new SituationPart("gang", "Gang", "{count} {suspect} at {location}", [], [], [], [])
+            { MinSuspects = 2, MaxSuspects = 3 });
+        parts.Locations.Add(new LocationPart("loc", "Test St", new Position(500, 0, 0), []));
+        parts.Suspects.Add(new SuspectPart("thug", "thugs", ["a", "b"], null, []));
+        parts.Outcomes.Add(new OutcomePart("runs", SuspectBehaviour.Flee, []));
+        parts.Outcomes.Add(new OutcomePart("fights", SuspectBehaviour.Fight, []));
+        var generator = new IncidentGenerator(parts, new SeededRandom(5));
+
+        var counts = new HashSet<int>();
+        var mixed = false;
+        for (int i = 0; i < 50; i++)
+        {
+            Incident incident = generator.Generate(Player, 100, 1500)!;
+            counts.Add(incident.Suspects.Count);
+            mixed |= incident.Suspects.Select(s => s.Outcome.Id).Distinct().Count() > 1;
+            Assert.StartsWith(incident.Suspects.Count == 2 ? "two" : "three", incident.DispatchMessage);
+        }
+        Assert.Equal([2, 3], counts.Order());
+        Assert.True(mixed);
+    }
+
+    [Fact]
+    public void BadSuspectCountsAreRejected()
+    {
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MinSuspects = 0 }.Validate());
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MinSuspects = 3, MaxSuspects = 2 }.Validate());
+        Assert.Throws<ArgumentException>(() => new SituationPart("x", "X", "d", [], [], [], []) { MaxSuspects = 5 }.Validate());
     }
 }
 

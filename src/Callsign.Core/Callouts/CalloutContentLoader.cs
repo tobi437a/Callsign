@@ -19,7 +19,11 @@ namespace Callsign.Core.Callouts
     ///     &lt;Dispatch&gt;Caller reports a {suspect} hanging around {location}.&lt;/Dispatch&gt;
     ///   &lt;/Situation&gt;
     ///   &lt;Location id="sandy-liquor" name="Scoops Liquor, Sandy Shores" x="1392" y="3604" z="34" tags="store,county" /&gt;
+    ///   &lt;Situation id="stolen-car" title="Stolen vehicle" vehicle="true" minSuspects="1" maxSuspects="2"&gt;
+    ///     &lt;Dispatch&gt;Stolen {suspect} spotted near {location}, {count} occupant(s).&lt;/Dispatch&gt;
+    ///   &lt;/Situation&gt;
     ///   &lt;Suspect id="hoodie" description="man in a grey hoodie" models="a_m_y_genstreet_01" /&gt;
+    ///   &lt;Suspect id="sultan" description="Karin Sultan" models="a_m_y_stwhi_01" vehicles="sultan" /&gt;
     ///   &lt;Outcome id="runs" behaviour="Flee" weight="2" /&gt;
     /// &lt;/CalloutContent&gt;
     /// </code>
@@ -64,7 +68,12 @@ namespace Callsign.Core.Callouts
                 added += TryAdd(sourceName, "situation", s.Id, log, () =>
                 {
                     parts.Situations.Add(new SituationPart(s.Id!, s.Title!, (s.Dispatch ?? "").Trim(),
-                        Tags(s.LocationTags), Tags(s.SuspectTags), Tags(s.OutcomeTags), Tags(s.Tags), s.Weight));
+                        Tags(s.LocationTags), Tags(s.SuspectTags), Tags(s.OutcomeTags), Tags(s.Tags), s.Weight)
+                    {
+                        InVehicle = s.Vehicle,
+                        MinSuspects = s.MinSuspects,
+                        MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
+                    });
                 });
             foreach (var l in content.Locations)
                 added += TryAdd(sourceName, "location", l.Id, log, () =>
@@ -75,7 +84,10 @@ namespace Callsign.Core.Callouts
                 added += TryAdd(sourceName, "suspect", p.Id, log, () =>
                 {
                     parts.Suspects.Add(new SuspectPart(p.Id!, p.Description!, Tags(p.Models),
-                        string.IsNullOrWhiteSpace(p.Weapon) ? null : p.Weapon!.Trim(), Tags(p.Tags), p.Weight));
+                        string.IsNullOrWhiteSpace(p.Weapon) ? null : p.Weapon!.Trim(), Tags(p.Tags), p.Weight)
+                    {
+                        Vehicles = Tags(p.Vehicles),
+                    });
                 });
             foreach (var o in content.Outcomes)
                 added += TryAdd(sourceName, "outcome", o.Id, log, () =>
@@ -128,6 +140,10 @@ namespace Callsign.Core.Callouts
         [XmlAttribute("locationTags")] public string? LocationTags { get; set; }
         [XmlAttribute("suspectTags")] public string? SuspectTags { get; set; }
         [XmlAttribute("outcomeTags")] public string? OutcomeTags { get; set; }
+        [XmlAttribute("vehicle")] public bool Vehicle { get; set; }
+        [XmlAttribute("minSuspects")] public int MinSuspects { get; set; } = 1;
+        /// <summary>0 (not set) = same as <see cref="MinSuspects"/>.</summary>
+        [XmlAttribute("maxSuspects")] public int MaxSuspects { get; set; }
         [XmlElement("Dispatch")] public string? Dispatch { get; set; }
     }
 
@@ -144,6 +160,7 @@ namespace Callsign.Core.Callouts
         [XmlAttribute("description")] public string? Description { get; set; }
         [XmlAttribute("models")] public string? Models { get; set; }
         [XmlAttribute("weapon")] public string? Weapon { get; set; }
+        [XmlAttribute("vehicles")] public string? Vehicles { get; set; }
     }
 
     public sealed class OutcomeXml : PartXml

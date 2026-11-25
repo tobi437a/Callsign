@@ -56,13 +56,21 @@ namespace Callsign.Plugins
 
         // ICalloutsApi
         public IDisposable AddSituation(CalloutSituation s) => Own(_parts.Situations.Add(new SituationPart(
-            s.Id, s.Title, s.Dispatch, s.LocationTags, s.SuspectTags, s.OutcomeTags, Array.Empty<string>(), s.Weight)));
+            s.Id, s.Title, s.Dispatch, s.LocationTags, s.SuspectTags, s.OutcomeTags, Array.Empty<string>(), s.Weight)
+        {
+            InVehicle = s.InVehicle,
+            MinSuspects = s.MinSuspects,
+            MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
+        }));
 
         public IDisposable AddLocation(CalloutLocation l) => Own(_parts.Locations.Add(new LocationPart(
             l.Id, l.Name, new Position(l.Position.X, l.Position.Y, l.Position.Z), l.Tags, l.Weight)));
 
         public IDisposable AddSuspect(CalloutSuspect p) => Own(_parts.Suspects.Add(new SuspectPart(
-            p.Id, p.Description, p.Models, string.IsNullOrWhiteSpace(p.Weapon) ? null : p.Weapon, p.Tags, p.Weight)));
+            p.Id, p.Description, p.Models, string.IsNullOrWhiteSpace(p.Weapon) ? null : p.Weapon, p.Tags, p.Weight)
+        {
+            Vehicles = p.Vehicles,
+        }));
 
         public IDisposable AddOutcome(CalloutOutcome o) => Own(_parts.Outcomes.Add(new OutcomePart(
             o.Id, ToCore(o.Reaction), o.Tags, o.Weight)));

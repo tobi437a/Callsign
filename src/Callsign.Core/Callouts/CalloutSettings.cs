@@ -24,5 +24,14 @@ namespace Callsign.Core.Callouts
         public float CatchDistance { get; set; } = 2.5f;
         /// <summary>A suspect this far from the player has got away.</summary>
         public float EscapeDistance { get; set; } = 250;
+
+        /// <summary>A suspect vehicle reacts to the player this close: a calm driver pulls over for lights, others flee.</summary>
+        public float VehicleEngageDistance { get; set; } = 35;
+        /// <summary>A fleeing vehicle this far from the player has got away.</summary>
+        public float VehicleEscapeDistance { get; set; } = 450;
+        /// <summary>A vehicle slower than this (m/s) counts as stopped.</summary>
+        public float StoppedSpeed { get; set; } = 1.5f;
+        /// <summary>A fleeing vehicle that has stood still this long is abandoned: everyone bails out.</summary>
+        public long BailAfterStoppedMs { get; set; } = 2_500;
     }
 }

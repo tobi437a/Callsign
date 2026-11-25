@@ -5,20 +5,35 @@ using Callsign.Core.World;
 
 namespace Callsign.Core.Callouts
 {
+    /// <summary>One suspect of an incident: which ped model, and how they will react.</summary>
+    public sealed record SuspectRoll(string Model, OutcomePart Outcome);
+
     /// <summary>One concrete incident: a part of each kind, plus the rolls made for it.</summary>
+    /// <param name="Suspects">At least one. In a vehicle, the first one drives.</param>
+    /// <param name="VehicleModel">The suspects' vehicle, or null when they are on foot.</param>
     public sealed record Incident(
         SituationPart Situation,
         LocationPart Location,
         SuspectPart Suspect,
-        OutcomePart Outcome,
-        string SuspectModel)
+        IReadOnlyList<SuspectRoll> Suspects,
+        string? VehicleModel = null)
     {
         public string Title => Situation.Title;
 
-        /// <summary>The dispatch line with the location and suspect filled in.</summary>
+        /// <summary>The first suspect's outcome (the driver's, in a vehicle).</summary>
+        public OutcomePart Outcome => Suspects[0].Outcome;
+
+        /// <summary>The first suspect's model.</summary>
+        public string SuspectModel => Suspects[0].Model;
+
+        /// <summary>The dispatch line with the location, suspect and number of suspects filled in.</summary>
         public string DispatchMessage => Situation.Dispatch
             .Replace("{location}", Location.Name)
-            .Replace("{suspect}", Suspect.Description);
+            .Replace("{suspect}", Suspect.Description)
+            .Replace("{count}", CountWord(Suspects.Count));
+
+        static string CountWord(int n) =>
+            n == 1 ? "one" : n == 2 ? "two" : n == 3 ? "three" : n == 4 ? "four" : n.ToString();
     }
 
     /// <summary>
@@ -58,11 +73,22 @@ namespace Callsign.Core.Callouts
             if (!Weighted.TryPick(situations, s => s.Weight, _random, out SituationPart situation)) return null;
             if (!Weighted.TryPick(locations.Where(situation.Fits).ToList(), l => l.Weight, _random, out LocationPart location)) return null;
             if (!Weighted.TryPick(_parts.Suspects.All.Where(p => situation.Fits(p) && p.Models.Count > 0).ToList(), p => p.Weight, _random, out SuspectPart suspect)) return null;
-            if (!Weighted.TryPick(_parts.Outcomes.All.Where(situation.Fits).ToList(), o => o.Weight, _random, out OutcomePart outcome)) return null;
+            var outcomes = _parts.Outcomes.All.Where(situation.Fits).ToList();
+            if (!Weighted.TryPick(outcomes, o => o.Weight, _random, out OutcomePart outcome)) return null;
 
-            string model = suspect.Models[_random.Next(suspect.Models.Count)];
-            return new Incident(situation, location, suspect, outcome, model);
+            var rolls = new List<SuspectRoll> { new SuspectRoll(PickModel(suspect), outcome) };
+            int count = situation.MaxSuspects <= situation.MinSuspects ? situation.MinSuspects
+                : situation.MinSuspects + _random.Next(situation.MaxSuspects - situation.MinSuspects + 1);
+            while (rolls.Count < count)
+            {
+                Weighted.TryPick(outcomes, o => o.Weight, _random, out OutcomePart other);   // can't fail: one was picked above
+                rolls.Add(new SuspectRoll(PickModel(suspect), other));
+            }
+            string? vehicle = suspect.InVehicle ? suspect.Vehicles[_random.Next(suspect.Vehicles.Count)] : null;
+            return new Incident(situation, location, suspect, rolls, vehicle);
         }
+
+        string PickModel(SuspectPart suspect) => suspect.Models[_random.Next(suspect.Models.Count)];
 
         static bool InRange(float distance, float min, float max) => distance >= min && distance <= max;
     }
