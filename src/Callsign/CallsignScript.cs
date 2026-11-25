@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using GTA;
 using Callsign.Core.Duty;
+using Callsign.Core.Entities;
 using Callsign.Core.Events;
 using Callsign.Engine;
 using Callsign.Modules;
@@ -22,6 +23,7 @@ namespace Callsign
         readonly FileLog _log;
         readonly KeyInput _input = new KeyInput();
         readonly List<IModule> _modules = new List<IModule>();
+        readonly EntityScopes _scopes;
 
         public CallsignScript()
         {
@@ -31,6 +33,7 @@ namespace Callsign
             // --- services ---
             var bus = new EventBus(ex => _log.Error("Event handler threw", ex));
             var duty = new DutyService(bus);
+            _scopes = new EntityScopes(_log);
 
             // --- modules, in tick order (plugins last) ---
             _modules.Add(new DutyModule(duty, bus, _input));
@@ -57,6 +60,9 @@ namespace Callsign
         {
             for (int i = _modules.Count - 1; i >= 0; i--)
                 Run(_modules[i], "Stop", _modules[i].Stop);
+            // Safety net: whatever a module left open is deleted now, so a reload leaves no ghost peds.
+            int leaked = _scopes.CloseAll(ReleaseMode.Delete);
+            if (leaked > 0) _log.Warn(leaked + " entity scope(s) were still open at stop; deleted them");
             _log.Info("Stopped");
         }
 
