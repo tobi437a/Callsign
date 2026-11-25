@@ -11,8 +11,8 @@ through a plugin API.
 > **Single player only.** Never launch GTA Online with this mod (or any ScriptHookV mod)
 > installed. Remove the files listed under [Uninstalling](#uninstalling) first.
 
-> **Early development.** Right now the mod has the on/off duty system and the plugin API.
-> Callouts, traffic stops, arrests and the career are being built. See [Roadmap](#roadmap).
+> **Early development.** Right now the mod has the on/off duty system, generated callouts and
+> the plugin API. Arrests, traffic stops and the career are being built. See [Roadmap](#roadmap).
 
 ---
 
@@ -37,6 +37,12 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 | Key | Action |
 |---|---|
 | `F7` | Go on / off duty. While on duty you can't get a wanted level and the game's own police are switched off. |
+| `Y` / `N` | Accept / decline the call dispatch is offering. |
+| `E` | Deal with the suspect (on foot, standing next to them). |
+| `End` | Call off the current callout. |
+
+While on duty, dispatch offers a call every minute or two. Accept it, follow the yellow route,
+and find the suspect: they might cooperate, run, or fight.
 
 ### Uninstalling
 Delete `Callsign.dll` and `Callsign.API.dll` from `scripts\`, and the `Callsign\` folder.
