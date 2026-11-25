@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Built-in callout parts. Incidents are drawn as situation x location x suspect x outcome.
+  A situation only uses locations/suspects/outcomes that carry one of the tags it lists
+  (empty list = any). Locations are snapped to the nearest spot a ped can stand on, so
+  coordinates only need to be close. Besides these, a street near the player (tags "street,public")
+  is always a candidate location.
+-->
+<CalloutContent>
+
+  <!-- Situations -->
+  <Situation id="suspicious-person" title="Suspicious person" locationTags="public,store" outcomeTags="calm,runs" weight="2">
+    <Dispatch>Caller reports a {suspect} acting suspiciously near {location}.</Dispatch>
+  </Situation>
+  <Situation id="shoplifting" title="Shoplifting" locationTags="store" outcomeTags="calm,runs,violent" weight="2">
+    <Dispatch>Store staff report a shoplifter at {location}: {suspect}, left on foot.</Dispatch>
+  </Situation>
+  <Situation id="disturbance" title="Disturbance" locationTags="public,store" suspectTags="rowdy" outcomeTags="calm,violent">
+    <Dispatch>Reports of a {suspect} shouting at passers-by near {location}.</Dispatch>
+  </Situation>
+  <Situation id="armed-person" title="Person with a weapon" locationTags="public,street" suspectTags="armed" outcomeTags="calm,runs,violent" weight="0.7">
+    <Dispatch>Caller saw a {suspect} with a weapon near {location}. Approach with caution.</Dispatch>
+  </Situation>
+
+  <!-- Stores (24/7, LTD, liquor) -->
+  <Location id="store-strawberry"   name="24/7, Innocence Blvd"      x="29"    y="-1350" z="29"  tags="store,city" />
+  <Location id="store-davis"        name="LTD, Grove Street"         x="-48"   y="-1757" z="29"  tags="store,city" />
+  <Location id="store-little-seoul" name="LTD, Palomino Ave"         x="-711"  y="-917"  z="19"  tags="store,city" />
+  <Location id="store-mirror-park"  name="LTD, Mirror Park Blvd"     x="1163"  y="-324"  z="69"  tags="store,city" />
+  <Location id="store-vinewood"     name="24/7, Clinton Ave"         x="374"   y="326"   z="103" tags="store,city" />
+  <Location id="liquor-vespucci"    name="Rob's Liquor, San Andreas Ave" x="-1223" y="-907" z="12" tags="store,city" />
+  <Location id="liquor-morningwood" name="Rob's Liquor, Prosperity St"   x="-1487" y="-379" z="40" tags="store,city" />
+  <Location id="liquor-el-rancho"   name="Rob's Liquor, El Rancho Blvd"  x="1136"  y="-982" z="46" tags="store,city" />
+  <Location id="store-tataviam"     name="24/7, Palomino Fwy"        x="2557"  y="382"   z="108" tags="store,county" />
+  <Location id="store-chumash"      name="24/7, Barbareno Rd"        x="-3241" y="1001"  z="12"  tags="store,county" />
+  <Location id="store-banham"       name="24/7, Ineseno Road"        x="-3040" y="585"   z="7"   tags="store,county" />
+  <Location id="store-harmony"      name="24/7, Route 68"            x="547"   y="2671"  z="42"  tags="store,county" />
+  <Location id="store-sandy"        name="24/7, Alhambra Dr"         x="1961"  y="3741"  z="32"  tags="store,county" />
+  <Location id="liquor-sandy"       name="Scoops Liquor, Sandy Shores" x="1393" y="3605" z="34" tags="store,county" />
+  <Location id="store-grapeseed"    name="LTD, Grapeseed Main St"    x="1698"  y="4924"  z="42"  tags="store,county" />
+  <Location id="store-paleto"       name="24/7, Great Ocean Hwy"     x="1729"  y="6415"  z="35"  tags="store,county" />
+
+  <!-- Public places -->
+  <Location id="legion-square"      name="Legion Square"             x="195"   y="-934"  z="30"  tags="public,city" />
+  <Location id="del-perro-pier"     name="Del Perro Pier"            x="-1638" y="-1012" z="13"  tags="public,city" />
+  <Location id="vespucci-beach"     name="Vespucci Beach boardwalk"  x="-1330" y="-1290" z="5"   tags="public,city" />
+  <Location id="vinewood-blvd"      name="Vinewood Blvd"             x="300"   y="180"   z="104" tags="public,city" />
+  <Location id="mirror-park"        name="Mirror Park"               x="1090"  y="-660"  z="57"  tags="public,city" />
+  <Location id="sandy-shores"       name="Sandy Shores, Alhambra Dr" x="1850"  y="3720"  z="33"  tags="public,county" />
+  <Location id="paleto-bay"         name="Paleto Blvd"               x="-275"  y="6235"  z="31"  tags="public,county" />
+
+  <!-- Suspects -->
+  <Suspect id="hoodie"      description="man in a hoodie"               models="a_m_y_stwhi_01,a_m_y_stbla_01,a_m_y_stlat_01" />
+  <Suspect id="skater"      description="young man with a skateboard"   models="a_m_y_skater_01,a_m_y_skater_02" />
+  <Suspect id="hipster"     description="young woman in a denim jacket" models="a_f_y_hipster_01,a_f_y_hipster_02" />
+  <Suspect id="drifter"     description="homeless man"                  models="a_m_m_tramp_01,a_m_o_tramp_01" tags="rowdy" />
+  <Suspect id="drunk"       description="visibly drunk man"             models="a_m_m_salton_01,a_m_m_hillbilly_01,a_m_y_methhead_01" tags="rowdy" />
+  <Suspect id="knife"       description="man with a knife"              models="a_m_y_methhead_01,a_m_m_salton_02" weapon="WEAPON_KNIFE" tags="armed,rowdy" weight="0.6" />
+  <Suspect id="bat"         description="man carrying a baseball bat"   models="a_m_y_mexthug_01,g_m_y_mexgoon_01" weapon="WEAPON_BAT" tags="armed" weight="0.6" />
+
+  <!-- Outcomes -->
+  <Outcome id="cooperates"  behaviour="Comply" tags="calm"    weight="3" />
+  <Outcome id="runs"        behaviour="Flee"   tags="runs"    weight="2" />
+  <Outcome id="attacks"     behaviour="Fight"  tags="violent" weight="1" />
+
+</CalloutContent>

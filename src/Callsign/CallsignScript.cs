@@ -9,9 +9,11 @@
 using System;
 using System.Collections.Generic;
 using GTA;
+using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
+using Callsign.Core.Ports;
 using Callsign.Engine;
 using Callsign.Modules;
 using Callsign.Plugins;
@@ -34,9 +36,18 @@ namespace Callsign
             var bus = new EventBus(ex => _log.Error("Event handler threw", ex));
             var duty = new DutyService(bus);
             _scopes = new EntityScopes(_log);
+            var random = new SeededRandom();
+
+            var parts = new CalloutParts();
+            int partCount = CalloutContentLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Callouts"), parts, _log);
+            _log.Info("Loaded " + partCount + " callout part(s)");
+            var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameBlips(),
+                new GameWorld(), new GameNotifier(), _log, new CalloutSettings());
+            var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, new GameClock(), random, sceneServices);
 
             // --- modules, in tick order (plugins last) ---
             _modules.Add(new DutyModule(duty, bus, _input));
+            _modules.Add(new CalloutsModule(callouts, _input));
             _modules.Add(new PluginsModule(paths.Plugins, duty, bus, _log));
 
             foreach (IModule m in _modules)
