@@ -38,16 +38,23 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 |---|---|
 | `F7` | Go on / off duty. While on duty you can't get a wanted level, the game's own police are switched off, and story phone calls, texts and random events wait until you go off duty. |
 | `Y` / `N` | Accept / decline the call dispatch is offering. |
-| `E` | Arrest the suspect (on foot, standing next to them). |
-| `H` | Let the suspect go with a warning. |
+| Hold `E` | Stop the suspect (on foot, close to them). |
+| `E` | Open / close the interaction menu (standing next to a stopped suspect). |
+| `Up` / `Down`, `Enter`, `Backspace` | Move through the menu, choose, close. |
 | `End` | Call off the current callout. |
 | `F9` | Ask dispatch for a call right now. |
 
 While on duty, dispatch offers a call every minute or two. Accept it, follow the yellow route,
 and find the suspect: they might cooperate, run, or fight. Runners give up when you catch them on
-foot; fighters give up once stunned or hurt. Arrested suspects follow you in cuffs: walk them to
-your car and get in, they take a back seat. Then drive them to the police station marked on the map
-to book them.
+foot; fighters give up once stunned or hurt.
+
+Hold `E` to stop a suspect, then press `E` to deal with them: ask for ID, question them, run their
+name over the radio, breathalyze them, take a drug swab (the kit is in your car, so park nearby),
+pat them down, then arrest them or let them go. Everyone has something to hide, or nothing: a
+warrant, a fake name, drink, drugs, a hidden weapon. Push the wrong person and they may run or fight.
+
+Arrested suspects follow you in cuffs: walk them to your car and get in, they take a back seat.
+Then drive them to the police station marked on the map to book them.
 
 ### Uninstalling
 Delete `Callsign.dll` and `Callsign.API.dll` from `scripts\`, and the `Callsign\` folder.

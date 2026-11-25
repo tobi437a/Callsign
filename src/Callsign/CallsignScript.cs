@@ -14,6 +14,8 @@ using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
+using Callsign.Core.Interaction;
+using Callsign.Core.Suspects;
 using Callsign.Core.Ports;
 using Callsign.Engine;
 using Callsign.Modules;
@@ -44,14 +46,21 @@ namespace Callsign
             _log.Info("Loaded " + partCount + " callout part(s)");
             List<PoliceStation> stations = StationLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Arrest"), _log);
             _log.Info("Loaded " + stations.Count + " police station(s)");
+            var suspectContent = new SuspectContent();
+            SuspectContentLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Suspects"), suspectContent, _log);
+            foreach (string missing in suspectContent.Missing())
+                _log.Warn("Suspect content has no " + missing + " (check Data\\Suspects)");
 
             var world = new GameWorld();
             var blips = new GameBlips();
             var notifier = new GameNotifier();
             var clock = new GameClock();
             var custody = new CustodyServices(world, blips, notifier, clock, stations, new CustodySettings());
+            var interaction = new InteractionServices(world, notifier, new GameMenuView(), clock, random,
+                new Dialogue(suspectContent, random), new InteractionSettings());
             var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), blips,
-                world, notifier, _log, new CalloutSettings(), custody);
+                world, notifier, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
+                interaction, custody);
             var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
 
             // --- modules, in tick order (plugins last) ---

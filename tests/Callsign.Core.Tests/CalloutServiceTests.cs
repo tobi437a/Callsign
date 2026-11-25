@@ -3,7 +3,10 @@ using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
+using Callsign.Core.Interaction;
 using Callsign.Core.Ports;
+using Callsign.Core.Suspects;
+using Callsign.Core.Ui;
 using Callsign.Core.World;
 using Xunit;
 
@@ -22,6 +25,13 @@ sealed class FakeWorld : IWorld
     public bool PlayerInVehicle { get; set; }
     public bool PlayerDead { get; set; }
     public bool HasStreets { get; set; }
+    public Position? PlayerVehicle { get; set; }
+
+    public bool TryGetPlayerVehiclePosition(out Position position)
+    {
+        position = PlayerVehicle ?? default;
+        return PlayerVehicle != null;
+    }
 
     public bool TryFindStreetNear(Position near, out Position position, out float heading)
     {
@@ -43,7 +53,10 @@ sealed class FakePed(Position at) : IPed
     public string? Weapon { get; private set; }
     public ReleaseMode? Released { get; private set; }
 
-    public void GiveWeapon(string weapon) => Weapon = weapon;
+    public bool IsMale { get; set; } = true;
+    public bool WeaponInHand { get; private set; }
+    public void GiveWeapon(string weapon, bool equip) { Weapon = weapon; WeaponInHand = equip; }
+    public void RemoveWeapons() { Weapon = null; WeaponInHand = false; }
     public void Wander() => Order = "wander";
     public void FacePlayer() => Order = "face";
     public void HandsUp() => Order = "handsup";
@@ -118,6 +131,12 @@ sealed class FakeNotifier : INotifier
     public void Help(string text) => HelpShown = text;
 }
 
+sealed class FakeMenuView : IMenuView
+{
+    public Menu? Last;
+    public void Draw(Menu menu) => Last = menu;
+}
+
 sealed class NullLog : ILog
 {
     public int Errors;
@@ -144,6 +163,7 @@ public class CalloutServiceTests
     readonly List<object> _events = [];
     readonly CalloutService _service;
     readonly CalloutSettings _settings = new();
+    readonly FakeMenuView _menu = new();
 
     public CalloutServiceTests()
     {
@@ -159,13 +179,38 @@ public class CalloutServiceTests
 
         var random = new SeededRandom(7);
         var custody = new CustodyServices(_world, _blips, _notifier, _clock, [Station], new CustodySettings());
-        var services = new CalloutSceneServices(_scopes, _peds, _blips, _world, _notifier, _log, _settings, custody);
+        // No hidden traits and no surprises: these tests are about the scene's flow.
+        var noTraits = new TraitChances { Warrant = 0, FalseNameOtherwise = 0, NoId = 0, Intoxicated = 0, HadADrink = 0,
+            OnDrugs = 0, CarryingDrugs = 0, ConcealedWeapon = 0, NervousOtherwise = 0 };
+        var content = new SuspectContent();
+        var interaction = new InteractionServices(_world, _notifier, _menu, _clock, random, new Dialogue(content, random),
+            new InteractionSettings());
+        var services = new CalloutSceneServices(_scopes, _peds, _blips, _world, _notifier, _log, _settings,
+            new SuspectProfileGenerator(content, random, noTraits), interaction, custody);
         _service = new CalloutService(new IncidentGenerator(_parts, random), _duty, _bus, _clock, random, services);
     }
 
     void UseOutcome(SuspectBehaviour behaviour) => _parts.Outcomes.Add(new OutcomePart("out", behaviour, []));
 
-    void Tick(bool interact = false, bool release = false) => _service.Tick(new CalloutInput(interact, release));
+    void Tick(bool stop = false, bool interact = false, MenuInput menu = default) =>
+        _service.Tick(new CalloutInput(stop, interact, menu));
+
+    /// <summary>Walks up to the suspect, stops them if needed and opens the menu.</summary>
+    void OpenMenu(FakePed suspect)
+    {
+        _world.PlayerPosition = suspect.Position with { X = suspect.Position.X - 2 };
+        Tick(stop: true);
+        Tick(interact: true);
+        Assert.NotNull(_menu.Last);
+    }
+
+    /// <summary>Moves to the menu item <paramref name="id"/> and picks it.</summary>
+    void Choose(string id)
+    {
+        for (int i = 0; i < 20 && _menu.Last!.Selected!.Id != id; i++) Tick(menu: new MenuInput(Down: true));
+        Assert.Equal(id, _menu.Last!.Selected!.Id);
+        Tick(menu: new MenuInput(Select: true));
+    }
 
     void Advance(long ms) { _clock.NowMs += ms; Tick(); }
 
@@ -256,17 +301,21 @@ public class CalloutServiceTests
     }
 
     [Fact]
-    public void CompliantSuspectCanBeLetGo()
+    public void CompliantSuspectKeepsWalkingUntilStoppedThenCanBeLetGo()
     {
         UseOutcome(SuspectBehaviour.Comply);
         FakePed suspect = StartAndArrive();
-        Assert.Equal("face", suspect.Order);
+        Assert.Equal("wander", suspect.Order);
         Assert.Equal("WEAPON_KNIFE", suspect.Weapon);
 
         _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
         Tick();
-        Assert.Equal(CalloutScene.InteractHelp, _notifier.HelpShown);
-        Tick(release: true);
+        Assert.Equal(SuspectInteraction.StopHelp, _notifier.HelpShown);
+        Assert.Equal("wander", suspect.Order);
+
+        OpenMenu(suspect);
+        Assert.Equal("face", suspect.Order);
+        Choose(SuspectInteraction.LetGo);
 
         Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
         Assert.Equal(ReleaseMode.Dismiss, suspect.Released);
@@ -289,8 +338,9 @@ public class CalloutServiceTests
         _world.PlayerOnFoot = true;
         Tick();
         Assert.Equal("handsup", suspect.Order);
-        Tick(release: true);
 
+        Tick(interact: true);   // already stopped: straight to the menu
+        Choose(SuspectInteraction.LetGo);
         Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
     }
 
@@ -299,9 +349,9 @@ public class CalloutServiceTests
     {
         UseOutcome(SuspectBehaviour.Comply);
         FakePed suspect = StartAndArrive();
-        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
+        OpenMenu(suspect);
 
-        Tick(interact: true);   // arrest
+        Choose(SuspectInteraction.Arrest);
         Tick();                 // cuff animation streaming
         Tick();                 // cuffed
         Assert.True(suspect.Cuffed);
@@ -337,8 +387,8 @@ public class CalloutServiceTests
         Tick();
 
         Assert.Equal("handsup", suspect.Order);
-        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
-        Tick(interact: true);
+        OpenMenu(suspect);
+        Choose(SuspectInteraction.Arrest);
         Tick();
         Tick();
         Assert.True(suspect.Cuffed);
@@ -349,8 +399,8 @@ public class CalloutServiceTests
     {
         UseOutcome(SuspectBehaviour.Comply);
         FakePed suspect = StartAndArrive();
-        _world.PlayerPosition = new Position(Scene.X - 2, 0, 0);
-        Tick(interact: true);
+        OpenMenu(suspect);
+        Choose(SuspectInteraction.Arrest);
 
         suspect.IsDead = true;
         Tick();

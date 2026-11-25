@@ -22,6 +22,13 @@ namespace Callsign.Engine
 
         public bool PlayerInVehicle => Game.Player.Character.IsInVehicle();
 
+        public bool TryGetPlayerVehiclePosition(out Position position)
+        {
+            Vehicle? vehicle = GamePed.PlayerVehicle();
+            position = vehicle?.Position.ToPosition() ?? default;
+            return vehicle != null;
+        }
+
         public bool PlayerDead => Game.Player.IsDead;
 
         public bool TryFindStreetNear(Position near, out Position position, out float heading)
@@ -63,9 +70,16 @@ namespace Callsign.Engine
         public bool IsDead => !Ped.Exists() || Ped.IsDead;
         public Position Position => Ped.Position.ToPosition();
 
-        public void GiveWeapon(string weapon)
+        public bool IsMale => !Ped.Exists() || Ped.Gender == Gender.Male;
+
+        public void GiveWeapon(string weapon, bool equip)
         {
-            if (Ped.Exists()) Ped.Weapons.Give((WeaponHash)(uint)Game.GenerateHash(weapon), 250, true, true);
+            if (Ped.Exists()) Ped.Weapons.Give((WeaponHash)(uint)Game.GenerateHash(weapon), 250, equip, true);
+        }
+
+        public void RemoveWeapons()
+        {
+            if (Ped.Exists()) Ped.Weapons.RemoveAll();
         }
 
         public void Wander() => Order(t => t.WanderAround());
@@ -139,7 +153,7 @@ namespace Callsign.Engine
         }
 
         /// <summary>The vehicle the player is in, or last drove, if it still exists.</summary>
-        static Vehicle? PlayerVehicle()
+        internal static Vehicle? PlayerVehicle()
         {
             Ped player = Game.Player.Character;
             Vehicle? vehicle = player.CurrentVehicle ?? player.LastVehicle;
