@@ -9,6 +9,26 @@ namespace Callsign.Core.Ports
         bool Exists { get; }
         bool IsDead { get; }
         Position Position { get; }
+
+        /// <summary>Gives a weapon by its game name (e.g. "WEAPON_KNIFE") and equips it.</summary>
+        void GiveWeapon(string weapon);
+
+        // Behaviour orders. Each replaces whatever the ped was doing; all do nothing once the ped is gone.
+
+        /// <summary>Walks around the area like a normal pedestrian.</summary>
+        void Wander();
+
+        /// <summary>Stops and keeps facing the player.</summary>
+        void FacePlayer();
+
+        /// <summary>Stops and puts their hands up.</summary>
+        void HandsUp();
+
+        /// <summary>Runs from the player.</summary>
+        void FleeFromPlayer();
+
+        /// <summary>Attacks the player.</summary>
+        void FightPlayer();
     }
 
     /// <summary>A vehicle we spawned. All members are safe to use after the vehicle is gone.</summary>
@@ -24,6 +44,15 @@ namespace Callsign.Core.Ports
         bool Exists { get; }
         string Name { set; }
         bool ShowRoute { set; }
+        MarkerColor Color { set; }
+    }
+
+    public enum MarkerColor
+    {
+        /// <summary>A place to go to.</summary>
+        Yellow,
+        /// <summary>A suspect.</summary>
+        Red,
     }
 
     /// <summary>

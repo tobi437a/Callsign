@@ -10,6 +10,10 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The shipped content, so tests can check it loads. -->
+    <None Include="..\..\data\**\*" LinkBase="data" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Callsign.Core\Callsign.Core.csproj" />
   </ItemGroup>
 </Project>
