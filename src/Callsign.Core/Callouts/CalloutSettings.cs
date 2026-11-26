@@ -22,6 +22,8 @@ namespace Callsign.Core.Callouts
         public float InteractDistance { get; set; } = 3;
         /// <summary>A fleeing suspect gives up when the player gets this close on foot.</summary>
         public float CatchDistance { get; set; } = 2.5f;
+        /// <summary>A suspect who starts running right next to the player can't be caught for this long (unless they got clear first).</summary>
+        public long CatchGraceMs { get; set; } = 4_000;
         /// <summary>A suspect this far from the player has got away.</summary>
         public float EscapeDistance { get; set; } = 250;
 
@@ -40,6 +42,9 @@ namespace Callsign.Core.Callouts
         /// <summary>A driver who has decided to stop gets out once slower than this (m/s), or after <see cref="StopTimeoutMs"/>.</summary>
         public float GetOutSpeed { get; set; } = 3;
         public long StopTimeoutMs { get; set; } = 8_000;
+
+        /// <summary>Accomplices (a twist) show up about this far from the suspect the player is dealing with.</summary>
+        public float AccompliceDistance { get; set; } = 15;
 
         /// <summary>How fleeing drivers wear down and give up.</summary>
         public PursuitSettings Pursuit { get; set; } = new PursuitSettings();

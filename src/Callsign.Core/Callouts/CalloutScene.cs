@@ -86,6 +86,12 @@ namespace Callsign.Core.Callouts
         SceneSuspect? _focus;
         SceneSuspect? _lastFinished;
 
+        enum TwistStage { Pending, Spawning, Done }
+        TwistStage _twistStage;
+        long _engagedAt = -1;
+        Position _twistAnchor;
+        int _accomplicesSpawned;
+
         public CalloutScene(Incident incident, CalloutSceneServices services)
         {
             _incident = incident;
@@ -160,7 +166,98 @@ namespace Callsign.Core.Callouts
 
             TickVehicle();
             TickSuspects(input);
-            return _suspects.All(x => x.IsDone) ? Finish() : null;
+            TickTwist();
+            return _twistStage != TwistStage.Spawning && _suspects.All(x => x.IsDone) ? Finish() : null;
+        }
+
+        // --- the complication: waits for its trigger, then plays out once ---
+
+        Twist? Twist => _incident?.Twist;
+
+        /// <summary>The twist has happened (or fizzled), for dev tools.</summary>
+        internal bool TwistDone => _twistStage == TwistStage.Done;
+
+        void TickTwist()
+        {
+            Twist? twist = Twist;
+            if (twist == null || _twistStage == TwistStage.Done) return;
+            if (_engagedAt < 0 && _suspects.Any(x => x.Current != SceneSuspect.State.Unaware && x.Current != SceneSuspect.State.Seated))
+                _engagedAt = _s.Clock.NowMs;
+            if (_twistStage == TwistStage.Spawning)
+            {
+                SpawnAccomplice(twist);
+                return;
+            }
+            if (!Triggered(twist.Part)) return;
+
+            _s.Log.Info("Twist '" + twist.Part.Id + "' (" + twist.Part.Kind + ") triggered");
+            if (twist.Part.Message != null) _s.Notifier.Notify(twist.Part.Message);
+            if (twist.Part.Kind == ComplicationKind.Panic) PanicOne(twist.Part.Behaviour ?? SuspectBehaviour.Flee);
+            else
+            {
+                _twistAnchor = (_focus ?? _suspects.FirstOrDefault(x => !x.IsDone && x.Ped.Exists) ?? Driver).Ped.Position;
+                _twistStage = TwistStage.Spawning;
+            }
+        }
+
+        bool Triggered(ComplicationPart part)
+        {
+            switch (part.Trigger)
+            {
+                case ComplicationTrigger.Arrival: return _engagedAt >= 0;
+                case ComplicationTrigger.Delay: return _engagedAt >= 0 && _s.Clock.NowMs - _engagedAt >= part.DelaySeconds * 1000;
+                case ComplicationTrigger.Stop: return _suspects.Any(x => x.Interaction.Stopped && !x.IsDone);
+                case ComplicationTrigger.Arrest:
+                    return _suspects.Any(x => x.Current == SceneSuspect.State.InCustody || x.Result == SuspectResult.Arrested);
+                default: return false;
+            }
+        }
+
+        /// <summary>The suspect the player is dealing with (else any calm one) breaks and runs or fights.</summary>
+        void PanicOne(SuspectBehaviour behaviour)
+        {
+            _twistStage = TwistStage.Done;
+            SceneSuspect? who = _focus != null && _focus.CanPanic ? _focus : _suspects.FirstOrDefault(x => x.CanPanic);
+            if (who == null)
+            {
+                _s.Log.Info("Twist: nobody calm left to panic");
+                return;
+            }
+            if (who.Panic(behaviour) && _vehicle != null) StartPursuit();
+        }
+
+        /// <summary>One accomplice per tick, a little way from where the action is; they react as soon as they're there.</summary>
+        void SpawnAccomplice(Twist twist)
+        {
+            if (_accomplicesSpawned >= twist.Accomplices.Count)
+            {
+                _twistStage = TwistStage.Done;
+                return;
+            }
+            SuspectRoll roll = twist.Accomplices[_accomplicesSpawned];
+            SuspectPart part = _incident!.Suspect;
+            string? weapon = twist.Part.Weapon ?? part.Weapon;
+            try
+            {
+                double angle = (_accomplicesSpawned * 2.1) + _s.Random.NextDouble();
+                float distance = _s.Settings.AccompliceDistance;
+                var near = new Position(_twistAnchor.X + (float)Math.Cos(angle) * distance,
+                    _twistAnchor.Y + (float)Math.Sin(angle) * distance, _twistAnchor.Z);
+                Position at = _s.World.TryFindPedSpotNear(near, out Position spot) ? spot : near;
+                if (!_s.Peds.TrySpawn(_scope, roll.Model, at, 0, out IPed? ped)) return;
+                SuspectProfile profile = _s.Profiles.Generate(ped!.IsMale, part.Tags, weapon != null);
+                if (weapon != null) ped.GiveWeapon(weapon, equip: true);
+                if (profile.ConcealedWeapon != null) ped.GiveWeapon(profile.ConcealedWeapon, equip: false);
+                var accomplice = new SceneSuspect(ped, profile, roll.Outcome.Behaviour, -1, _scope, _s);
+                _suspects.Add(accomplice);
+                accomplice.Engage();
+                _accomplicesSpawned++;
+            }
+            catch (ArgumentException ex)
+            {
+                _s.Log.Error("Twist '" + twist.Part.Id + "': could not spawn '" + roll.Model + "'", ex);
+                _twistStage = TwistStage.Done;
+            }
         }
 
         // --- spawning: one entity per tick, vehicle first ---
@@ -465,6 +562,7 @@ namespace Callsign.Core.Callouts
                 + (x.Interaction.Stopped ? " [stopped]" : "") + (x.Interaction.MenuOpen ? " [menu]" : "")
                 + (x.Ped.Exists ? " " + x.Ped.Position.DistanceTo(player).ToString("0") + "m" : " gone")));
             return Current + (Vehicle != VehicleStage.None ? " vehicle=" + Vehicle : "")
+                + (Twist != null ? " twist=" + Twist.Part.Id + "/" + _twistStage : "")
                 + " spot=" + _spot.DistanceTo(player).ToString("0") + "m"
                 + (suspects.Length > 0 ? " suspects: " + suspects : "");
         }

@@ -12,6 +12,10 @@ namespace Callsign.Core.Director
         double Factor(LocationPart location);
         double Factor(SuspectPart suspect);
         double Factor(OutcomePart outcome);
+        double Factor(ComplicationPart complication);
+
+        /// <summary>Multiplies a situation's complication chance (1 = as configured).</summary>
+        double ComplicationScale { get; }
 
         /// <summary>Multiplies the wait before the next call (1 = as configured).</summary>
         double GapScale { get; }
@@ -25,6 +29,8 @@ namespace Callsign.Core.Director
         public double Factor(LocationPart location) => 1;
         public double Factor(SuspectPart suspect) => 1;
         public double Factor(OutcomePart outcome) => 1;
+        public double Factor(ComplicationPart complication) => 1;
+        public double ComplicationScale => 1;
         public double GapScale => 1;
     }
 }

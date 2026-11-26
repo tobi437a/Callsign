@@ -1,0 +1,55 @@
+# Mid-call twists: a second shoplifter shows up on arrival; a stopped suspect bolts after the delay;
+# a pulled-over driver floors it. Cancelling cleans everything up. Takes ~2 min: run with -TimeoutSec 200.
+mark scenario twists
+god on
+duty on
+wait 500
+call shoplifting second-suspect
+accept
+expect twist=second-suspect/Pending
+tp scene 60
+wait 3000
+tp scene 10
+wait 2500
+expect twist=second-suspect/Done
+expect #1
+cancel
+wait 500
+expect scopes=0
+call suspicious-person bolts
+accept
+tp scene 60
+wait 3000
+tp scene 10
+wait 1500
+expect twist=bolts/Pending
+expect! Running
+wait 26000
+expect twist=bolts/Done
+expect Running
+cancel
+wait 500
+expect scopes=0
+duty off
+# A pulled-over drunk driver floors it a while after stopping: the call becomes a pursuit.
+god on
+tp 430 -1426 29
+car police3
+duty on
+lights on
+wait 500
+call drunk-driver floors-it
+accept
+tp scene 40
+wait 4000
+tp scene 15
+wait 15000
+expect vehicle=Stopped
+expect twist=floors-it/Pending
+wait 13000
+expect twist=floors-it/Done
+expect vehicle=Pursuit
+cancel
+wait 500
+expect scopes=0
+duty off

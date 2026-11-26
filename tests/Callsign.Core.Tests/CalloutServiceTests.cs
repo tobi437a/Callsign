@@ -749,6 +749,110 @@ public class CalloutServiceTests
         Assert.Equal(0, _scopes.OpenCount);
     }
 
+    /// <summary>The test call always gets <paramref name="twist"/>.</summary>
+    void UseTwist(ComplicationPart twist)
+    {
+        _footCall.Dispose();
+        _parts.Situations.Add(new SituationPart("twisty", "Test call", "{suspect} at {location}", [], [], [], [])
+            { ComplicationTags = ["t"], ComplicationChance = 1 });
+        _parts.Complications.Add(twist with { Tags = ["t"] });
+        UseOutcome(SuspectBehaviour.Comply);
+    }
+
+    [Fact]
+    public void AccompliceShowsUpOnArrivalAndKeepsTheCallOpen()
+    {
+        UseTwist(new ComplicationPart("second", ComplicationKind.Accomplice, ComplicationTrigger.Arrival, "Two of them!", [])
+            { Behaviour = SuspectBehaviour.Flee });
+        FakePed suspect = StartAndArrive();
+        Tick();   // spawns the accomplice
+
+        Assert.Equal(2, _peds.All.Count);
+        FakePed accomplice = _peds.All[1];
+        Assert.Equal("flee", accomplice.Order);
+        Assert.Equal("WEAPON_KNIFE", accomplice.Weapon);   // the call's suspect's weapon
+        Assert.Contains("Two of them!", _notifier.Messages);
+
+        OpenMenu(suspect);
+        Choose(SuspectInteraction.LetGo);
+        Assert.Equal(CalloutService.Phase.Active, _service.Current);   // the runner is still out there
+
+        accomplice.Position = new Position(Scene.X + _settings.EscapeDistance + 50, 0, 0);
+        Tick();
+        Assert.Equal(CalloutEndReason.Resolved, Ended().Reason);
+        Assert.Equal(0, _scopes.OpenCount);
+    }
+
+    [Fact]
+    public void CalmSuspectBoltsMidConversationAfterTheDelay()
+    {
+        UseTwist(new ComplicationPart("bolts", ComplicationKind.Panic, ComplicationTrigger.Delay, null, []) { DelaySeconds = 10 });
+        FakePed suspect = StartAndArrive();
+        OpenMenu(suspect);
+        Assert.Equal("face", suspect.Order);
+
+        Advance(10_000);
+
+        Assert.Equal("flee", suspect.Order);
+        Assert.Contains(_notifier.Messages, m => m.Contains("fleeing"));
+        Tick(interact: true);   // no menu on a runner
+        Assert.Equal(CalloutService.Phase.Active, _service.Current);
+
+        Advance(1_000);   // still right next to the player: a head start, not caught on the spot
+        Assert.Equal("flee", suspect.Order);
+        Advance(_settings.CatchGraceMs);
+        Assert.Equal("handsup", suspect.Order);
+    }
+
+    [Fact]
+    public void FriendsTryToFreeTheArrestedSuspect()
+    {
+        UseTwist(new ComplicationPart("rescue", ComplicationKind.Accomplice, ComplicationTrigger.Arrest, null, [])
+            { Behaviour = SuspectBehaviour.Fight, Count = 2, Models = ["friend"], Weapon = "WEAPON_BAT" });
+        FakePed suspect = StartAndArrive();
+        OpenMenu(suspect);
+        Assert.Single(_peds.All);
+
+        Choose(SuspectInteraction.Arrest);
+        Tick();
+        Tick();
+
+        Assert.Equal(3, _peds.All.Count);
+        Assert.All(_peds.All.Skip(1), p => Assert.Equal(("fight", "WEAPON_BAT"), (p.Order, p.Weapon)));
+    }
+
+    [Fact]
+    public void PulledOverDriverFloorsItWhenTheTwistHits()
+    {
+        _footCall.Dispose();
+        _parts.Situations.Add(new SituationPart("car", "Test call", "{suspect} at {location}", [], [], [], [])
+            { InVehicle = true, ComplicationTags = ["t"], ComplicationChance = 1 });
+        _parts.Suspects.Add(new SuspectPart("car", "Karin Sultan", ["model"], null, []) { Vehicles = ["sultan"] });
+        _parts.Complications.Add(new ComplicationPart("floors-it", ComplicationKind.Panic, ComplicationTrigger.Stop, null, ["t"]));
+        UseOutcome(SuspectBehaviour.Comply);
+        _world.HasStreets = true;
+        _duty.SetOnDuty(true);
+        Tick();
+        Advance(_settings.FirstOfferMaxMs);
+        Assert.True(_service.Accept());
+        _world.PlayerPosition = new Position(Scene.X - 100, 0, 0);
+        for (int i = 0; i < 6; i++) Tick();   // spawn the car, then the driver
+        FakeVehicle car = _vehicles.Last!;
+        FakePed driver = _peds.Last!;
+
+        _world.PlayerPosition = new Position(car.Position.X - 20, 0, 0);
+        _world.PlayerLightsOn = true;
+        Tick();
+        Assert.Equal("pullover", driver.Order);
+        car.Speed = 0;
+        driver.AtPullOverSpot = true;
+        Tick();
+        Advance(_settings.PulledOverMs);   // stopped: the twist fires
+
+        Assert.Equal("driveaway", driver.Order);
+        Assert.Contains(_notifier.Messages, m => m.Contains("fleeing"));
+    }
+
     static void Assume(bool condition) => Assert.True(condition, "test setup: seed did not pick the expected part");
 }
 

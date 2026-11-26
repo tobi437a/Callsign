@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Complications: mid-call twists. Dispatch never mentions them; the player finds out when they happen.
+  A situation can get one if it lists one of its tags in complicationTags; complicationChance (0..1,
+  default 0.35) is how likely that is, and dispatch lowers it on a tense shift and raises it after a quiet one.
+
+  kind     Accomplice = more people involved show up near the suspect (count 1..3; models default to
+                        the call's suspect, weapon too; behaviour Comply/Flee/Fight, or rolled like the suspects)
+           Panic      = a suspect who was cooperating runs (behaviour Flee, default) or attacks (Fight);
+                        a driver at the wheel drives off and it becomes a pursuit
+  trigger  Arrival (suspects first notice the officer), Delay (delay seconds after that),
+           Stop (the player stops a suspect / the pulled-over car stops), Arrest (a suspect is arrested)
+-->
+<CalloutContent>
+
+  <!-- On foot -->
+  <Complication id="bolts" kind="Panic" trigger="Delay" delay="25" tags="foot" weight="1.5" />
+  <Complication id="turns-violent" kind="Panic" trigger="Delay" delay="40" behaviour="Fight" tags="foot" weight="0.6">
+    <Message>~r~The suspect snaps!~s~</Message>
+  </Complication>
+  <Complication id="second-suspect" kind="Accomplice" trigger="Arrival" tags="store">
+    <Message>~o~Dispatch:~s~ staff say there were two of them.</Message>
+  </Complication>
+  <Complication id="friends-join" kind="Accomplice" trigger="Stop" count="2" tags="group">
+    <Message>~o~Their friends are coming over.~s~</Message>
+  </Complication>
+  <Complication id="rescue-attempt" kind="Accomplice" trigger="Arrest" behaviour="Fight" tags="group,robbery,gang" weight="0.8">
+    <Message>~r~Someone is coming to get your prisoner back!~s~</Message>
+  </Complication>
+  <Complication id="lookout" kind="Accomplice" trigger="Delay" delay="10" behaviour="Fight" tags="robbery">
+    <Message>~r~Dispatch: a third suspect was waiting outside, armed!~s~</Message>
+  </Complication>
+
+  <!-- Vehicles -->
+  <Complication id="floors-it" kind="Panic" trigger="Delay" delay="12" tags="vehicle" />
+
+</CalloutContent>

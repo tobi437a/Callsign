@@ -68,9 +68,19 @@ namespace Callsign.Core.Callouts
 
         public const double DefaultIntensity = 0.3;
 
+        /// <summary>A complication fits if it has any of these tags. Empty = none fit (no twists unless asked for).</summary>
+        public IReadOnlyList<string> ComplicationTags { get; init; } = Array.Empty<string>();
+
+        /// <summary>0..1: chance this call gets a complication (when one fits). The director tilts it with the shift's pace.</summary>
+        public double ComplicationChance { get; init; } = DefaultComplicationChance;
+
+        public const double DefaultComplicationChance = 0.35;
+
         public bool Fits(LocationPart location) => TagMatch.Any(LocationTags, location.Tags);
         public bool Fits(SuspectPart suspect) => suspect.InVehicle == InVehicle && TagMatch.Any(SuspectTags, suspect.Tags);
         public bool Fits(OutcomePart outcome) => TagMatch.Any(OutcomeTags, outcome.Tags);
+        public bool Fits(ComplicationPart complication) =>
+            ComplicationTags.Count > 0 && TagMatch.Any(ComplicationTags, complication.Tags);
 
         public void Validate()
         {
@@ -79,6 +89,7 @@ namespace Callsign.Core.Callouts
             if (MinSuspects < 1 || MaxSuspects < MinSuspects || MaxSuspects > SuspectLimit)
                 throw new ArgumentException("suspect count must be 1.." + SuspectLimit + " with min <= max");
             if (!(Intensity >= 0 && Intensity <= 1)) throw new ArgumentException("intensity must be 0..1");
+            if (!(ComplicationChance >= 0 && ComplicationChance <= 1)) throw new ArgumentException("complication chance must be 0..1");
         }
     }
 
@@ -114,6 +125,74 @@ namespace Callsign.Core.Callouts
         {
             if (!Enum.IsDefined(typeof(SuspectBehaviour), Behaviour)) throw new ArgumentException("unknown behaviour " + Behaviour);
         }
+    }
+
+    /// <summary>
+    /// A twist rolled with the call and kept secret from dispatch: something that changes the call
+    /// partway through (a second suspect shows up, a calm suspect bolts, friends attack during the arrest).
+    /// </summary>
+    /// <param name="Message">Shown to the player when it happens, or null for no notice.</param>
+    public sealed record ComplicationPart(
+        string Id,
+        ComplicationKind Kind,
+        ComplicationTrigger Trigger,
+        string? Message,
+        IReadOnlyList<string> Tags,
+        double Weight = 1) : ICalloutPart
+    {
+        /// <summary>Seconds after the player arrives, for <see cref="ComplicationTrigger.Delay"/>.</summary>
+        public double DelaySeconds { get; init; } = 20;
+
+        /// <summary>
+        /// <see cref="ComplicationKind.Accomplice"/>: how they react (null = rolled like the call's suspects).
+        /// <see cref="ComplicationKind.Panic"/>: what the suspect does instead (null = runs).
+        /// </summary>
+        public SuspectBehaviour? Behaviour { get; init; }
+
+        /// <summary>Accomplices: how many show up (1..3).</summary>
+        public int Count { get; init; } = 1;
+
+        /// <summary>Accomplices: ped models. Empty = the same kind of person as the call's suspect.</summary>
+        public IReadOnlyList<string> Models { get; init; } = Array.Empty<string>();
+
+        /// <summary>Accomplices: weapon in hand, or null for the call's suspect's weapon (if any).</summary>
+        public string? Weapon { get; init; }
+
+        public const int AccompliceLimit = 3;
+
+        public void Validate()
+        {
+            if (!Enum.IsDefined(typeof(ComplicationKind), Kind)) throw new ArgumentException("unknown kind " + Kind);
+            if (!Enum.IsDefined(typeof(ComplicationTrigger), Trigger)) throw new ArgumentException("unknown trigger " + Trigger);
+            if (Behaviour != null && !Enum.IsDefined(typeof(SuspectBehaviour), Behaviour.Value)) throw new ArgumentException("unknown behaviour " + Behaviour);
+            if (Kind == ComplicationKind.Accomplice && (Count < 1 || Count > AccompliceLimit))
+                throw new ArgumentException("count must be 1.." + AccompliceLimit);
+            if (Kind == ComplicationKind.Panic && Behaviour == SuspectBehaviour.Comply)
+                throw new ArgumentException("a panic needs Flee or Fight");
+            if (!(DelaySeconds >= 0)) throw new ArgumentException("delay must be 0 or more");
+        }
+    }
+
+    /// <summary>What a complication does.</summary>
+    public enum ComplicationKind
+    {
+        /// <summary>More people involved show up near the suspect.</summary>
+        Accomplice,
+        /// <summary>A suspect who was cooperating suddenly runs or attacks (a driver floors it).</summary>
+        Panic,
+    }
+
+    /// <summary>When a complication happens.</summary>
+    public enum ComplicationTrigger
+    {
+        /// <summary>When the suspects first notice the officer.</summary>
+        Arrival,
+        /// <summary>A while (<see cref="ComplicationPart.DelaySeconds"/>) after that.</summary>
+        Delay,
+        /// <summary>When the player stops a suspect (or a pulled-over vehicle stops).</summary>
+        Stop,
+        /// <summary>When the player arrests a suspect.</summary>
+        Arrest,
     }
 
     /// <summary>The suspect's reaction when the officer arrives.</summary>

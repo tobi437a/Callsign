@@ -74,6 +74,8 @@ namespace Callsign.Core.Callouts
                         MinSuspects = s.MinSuspects,
                         MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
                         Intensity = s.Intensity,
+                        ComplicationTags = Tags(s.ComplicationTags),
+                        ComplicationChance = s.ComplicationChance,
                     });
                 });
             foreach (var l in content.Locations)
@@ -97,7 +99,27 @@ namespace Callsign.Core.Callouts
                         throw new FormatException("unknown behaviour '" + o.Behaviour + "' (use " + string.Join(", ", Enum.GetNames(typeof(SuspectBehaviour))) + ")");
                     parts.Outcomes.Add(new OutcomePart(o.Id!, behaviour, Tags(o.Tags), o.Weight));
                 });
+            foreach (var c in content.Complications)
+                added += TryAdd(sourceName, "complication", c.Id, log, () =>
+                {
+                    parts.Complications.Add(new ComplicationPart(c.Id!, ParseEnum<ComplicationKind>(c.Kind, "kind"),
+                        ParseEnum<ComplicationTrigger>(c.Trigger, "trigger"),
+                        string.IsNullOrWhiteSpace(c.Message) ? null : c.Message!.Trim(), Tags(c.Tags), c.Weight)
+                    {
+                        DelaySeconds = c.Delay,
+                        Behaviour = string.IsNullOrWhiteSpace(c.Behaviour) ? (SuspectBehaviour?)null : ParseEnum<SuspectBehaviour>(c.Behaviour, "behaviour"),
+                        Count = c.Count,
+                        Models = Tags(c.Models),
+                        Weapon = string.IsNullOrWhiteSpace(c.Weapon) ? null : c.Weapon!.Trim(),
+                    });
+                });
             return added;
+        }
+
+        static T ParseEnum<T>(string? value, string what) where T : struct
+        {
+            if (Enum.TryParse(value, true, out T parsed) && Enum.IsDefined(typeof(T), parsed)) return parsed;
+            throw new FormatException("unknown " + what + " '" + value + "' (use " + string.Join(", ", Enum.GetNames(typeof(T))) + ")");
         }
 
         static int TryAdd(string source, string kind, string? id, ILog log, Action add)
@@ -126,6 +148,7 @@ namespace Callsign.Core.Callouts
         [XmlElement("Location")] public List<LocationXml> Locations { get; set; } = new List<LocationXml>();
         [XmlElement("Suspect")] public List<SuspectXml> Suspects { get; set; } = new List<SuspectXml>();
         [XmlElement("Outcome")] public List<OutcomeXml> Outcomes { get; set; } = new List<OutcomeXml>();
+        [XmlElement("Complication")] public List<ComplicationXml> Complications { get; set; } = new List<ComplicationXml>();
     }
 
     public abstract class PartXml
@@ -147,6 +170,9 @@ namespace Callsign.Core.Callouts
         [XmlAttribute("maxSuspects")] public int MaxSuspects { get; set; }
         /// <summary>0..1, see <see cref="SituationPart.Intensity"/>.</summary>
         [XmlAttribute("intensity")] public double Intensity { get; set; } = SituationPart.DefaultIntensity;
+        [XmlAttribute("complicationTags")] public string? ComplicationTags { get; set; }
+        /// <summary>0..1, see <see cref="SituationPart.ComplicationChance"/>.</summary>
+        [XmlAttribute("complicationChance")] public double ComplicationChance { get; set; } = SituationPart.DefaultComplicationChance;
         [XmlElement("Dispatch")] public string? Dispatch { get; set; }
     }
 
@@ -169,5 +195,18 @@ namespace Callsign.Core.Callouts
     public sealed class OutcomeXml : PartXml
     {
         [XmlAttribute("behaviour")] public string? Behaviour { get; set; }
+    }
+
+    public sealed class ComplicationXml : PartXml
+    {
+        [XmlAttribute("kind")] public string? Kind { get; set; }
+        [XmlAttribute("trigger")] public string? Trigger { get; set; }
+        /// <summary>Seconds, for trigger="Delay".</summary>
+        [XmlAttribute("delay")] public double Delay { get; set; } = 20;
+        [XmlAttribute("behaviour")] public string? Behaviour { get; set; }
+        [XmlAttribute("count")] public int Count { get; set; } = 1;
+        [XmlAttribute("models")] public string? Models { get; set; }
+        [XmlAttribute("weapon")] public string? Weapon { get; set; }
+        [XmlElement("Message")] public string? Message { get; set; }
     }
 }

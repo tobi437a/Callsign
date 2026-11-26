@@ -66,6 +66,23 @@ namespace Callsign.API.Callouts
         /// 0.9 shots fired from a vehicle. Default 0.3. Since API 0.5.
         /// </summary>
         public double Intensity { get; set; } = 0.3;
+
+        /// <summary>
+        /// Complications (twists) that can happen in this call: one fits if it has any of these tags.
+        /// Empty (default) = no twists. Built-in tags: "foot", "store", "group", "robbery", "vehicle", "gang". Since API 0.6.
+        /// </summary>
+        public IReadOnlyList<string> ComplicationTags
+        {
+            get => _complicationTags;
+            set => _complicationTags = TagList.Copy(value);
+        }
+        IReadOnlyList<string> _complicationTags = Array.Empty<string>();
+
+        /// <summary>
+        /// 0 to 1: chance the call gets a complication (when one fits). Dispatch lowers it on a tense shift
+        /// and raises it after a quiet spell. Default 0.35. Since API 0.6.
+        /// </summary>
+        public double ComplicationChance { get; set; } = 0.35;
     }
 
     /// <summary>A place where incidents can happen.</summary>
@@ -169,6 +186,90 @@ namespace Callsign.API.Callouts
         public IReadOnlyList<string> Tags { get; }
         /// <summary>Relative chance of being picked.</summary>
         public double Weight { get; }
+    }
+
+    /// <summary>
+    /// A twist that can happen partway through a call: more people show up, or a cooperating suspect
+    /// suddenly runs or attacks. Dispatch doesn't mention it; the player finds out when it happens.
+    /// Situations pick complications by tag (<see cref="CalloutSituation.ComplicationTags"/>). Since API 0.6.
+    /// </summary>
+    public sealed class CalloutComplication
+    {
+        /// <summary>Creates a complication.</summary>
+        /// <param name="id">Unique id, prefixed with your plugin's name.</param>
+        /// <param name="kind">What happens.</param>
+        /// <param name="trigger">When it happens.</param>
+        /// <param name="message">Notification shown when it happens (e.g. "~r~A second suspect is coming out of the store!~s~"), or null.</param>
+        /// <param name="tags">Labels situations filter on.</param>
+        /// <param name="weight">Relative chance of being picked among the fitting complications.</param>
+        public CalloutComplication(string id, ComplicationKind kind, ComplicationTrigger trigger, string? message = null,
+            IEnumerable<string>? tags = null, double weight = 1)
+        {
+            Id = id;
+            Kind = kind;
+            Trigger = trigger;
+            Message = message;
+            Tags = TagList.Copy(tags);
+            Weight = weight;
+        }
+
+        /// <summary>Unique id.</summary>
+        public string Id { get; }
+        /// <summary>What happens.</summary>
+        public ComplicationKind Kind { get; }
+        /// <summary>When it happens.</summary>
+        public ComplicationTrigger Trigger { get; }
+        /// <summary>Notification shown when it happens, or null.</summary>
+        public string? Message { get; }
+        /// <summary>Labels situations filter on.</summary>
+        public IReadOnlyList<string> Tags { get; }
+        /// <summary>Relative chance of being picked.</summary>
+        public double Weight { get; }
+
+        /// <summary>Seconds after the player arrives, for <see cref="ComplicationTrigger.Delay"/>. Default 20.</summary>
+        public double DelaySeconds { get; set; } = 20;
+
+        /// <summary>
+        /// <see cref="ComplicationKind.Accomplice"/>: how the newcomers react (null = rolled from the call's outcomes).
+        /// <see cref="ComplicationKind.Panic"/>: <see cref="SuspectReaction.Flee"/> (default when null) or <see cref="SuspectReaction.Fight"/>.
+        /// </summary>
+        public SuspectReaction? Reaction { get; set; }
+
+        /// <summary>Accomplices: how many show up (1 to 3, default 1).</summary>
+        public int Count { get; set; } = 1;
+
+        /// <summary>Accomplices: ped model names. Empty (default) = the same kind of person as the call's suspect.</summary>
+        public IReadOnlyList<string> Models
+        {
+            get => _models;
+            set => _models = TagList.Copy(value);
+        }
+        IReadOnlyList<string> _models = Array.Empty<string>();
+
+        /// <summary>Accomplices: weapon they hold (e.g. "WEAPON_PISTOL"), or null for the call's suspect's weapon, if any.</summary>
+        public string? Weapon { get; set; }
+    }
+
+    /// <summary>What a complication does. Since API 0.6.</summary>
+    public enum ComplicationKind
+    {
+        /// <summary>More people involved show up near the suspect the player is dealing with.</summary>
+        Accomplice,
+        /// <summary>A suspect who was cooperating suddenly runs or attacks (a driver at the wheel drives off).</summary>
+        Panic,
+    }
+
+    /// <summary>When a complication happens. Since API 0.6.</summary>
+    public enum ComplicationTrigger
+    {
+        /// <summary>When the suspects first notice the officer.</summary>
+        Arrival,
+        /// <summary><see cref="CalloutComplication.DelaySeconds"/> after that.</summary>
+        Delay,
+        /// <summary>When the player stops a suspect (or a pulled-over vehicle comes to a stop).</summary>
+        Stop,
+        /// <summary>When the player arrests a suspect.</summary>
+        Arrest,
     }
 
     /// <summary>A suspect's reaction when the officer arrives.</summary>

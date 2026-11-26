@@ -12,8 +12,8 @@ through a plugin API.
 > installed. Remove the files listed under [Uninstalling](#uninstalling) first.
 
 > **Early development.** Right now the mod has the on/off duty system, generated callouts
-> (on foot and in vehicles), traffic stops, stopping and questioning suspects, arrests and the
-> plugin API. The career is being built. See [Roadmap](#roadmap).
+> (on foot and in vehicles) with mid-call twists, traffic stops, stopping and questioning
+> suspects, arrests and the plugin API. The career is being built. See [Roadmap](#roadmap).
 
 ---
 
@@ -86,12 +86,12 @@ with the built-in calls. Built-in content uses the same API.
 - [x] On/off duty
 - [x] Plugin API foundation
 - [x] Callouts assembled from parts (plugins can add parts)
-- [ ] Mid-call twists
+- [x] Mid-call twists
 - [x] Arrests: cuffing, transport, booking
 - [x] Stopping and questioning suspects; vehicle calls and pursuits
 - [x] Traffic stops
 - [ ] Pedestrian stops
-- [ ] Pacing director: calm after chaos, no repeats back-to-back
+- [x] Pacing director: calm after chaos, no repeats back-to-back
 - [ ] Pick a mode on every start: **Career** or **Free patrol** (everything unlocked)
 - [ ] Career: rookie in Los Santos with a field training officer → Officer → Senior Officer → Sergeant → specialisations
 - [ ] Backup and support units, pursuit tactics, investigations
