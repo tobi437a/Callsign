@@ -627,6 +627,44 @@ namespace Callsign.Engine
         }
     }
 
+    internal sealed class GamePedestrians : IPedestrians
+    {
+        public bool AnyoneToStop(float maxDistance) => Find(maxDistance) != null;
+
+        public bool TryTakePedNearby(EntityScope scope, float maxDistance, out IPed? ped)
+        {
+            ped = null;
+            Ped? found = Find(maxDistance);
+            if (found == null) return false;
+            found.IsPersistent = true;
+            ped = scope.Track(new GamePed(found));
+            return true;
+        }
+
+        /// <summary>The person on foot the player is closest to and roughly facing.</summary>
+        static Ped? Find(float maxDistance)
+        {
+            Ped player = Game.Player.Character;
+            if (!player.Exists() || player.IsInVehicle()) return null;
+            Ped? best = null;
+            float bestScore = float.MaxValue;
+            foreach (Ped p in World.GetNearbyPeds(player, maxDistance))
+            {
+                if (!p.Exists() || p.IsDead || p.IsPlayer || p.IsPersistent || !p.IsHuman || p.IsInVehicle() || p.IsRagdoll) continue;
+                PedType type = p.PedType;
+                if (type == PedType.Cop || type == PedType.Swat || type == PedType.Army || type == PedType.Medic || type == PedType.Fire) continue;
+                Vector3 to = p.Position - player.Position;
+                to.Z = 0;
+                float distance = to.Length();
+                float facing = distance < 0.5f ? 1f : Vector3.Dot(to / distance, player.ForwardVector);   // 1 = straight ahead
+                if (facing < 0.3f) continue;
+                float score = distance / facing;
+                if (score < bestScore) { best = p; bestScore = score; }
+            }
+            return best;
+        }
+    }
+
     internal sealed class GameBlips : IBlips
     {
         public IBlip At(EntityScope scope, Position position) =>

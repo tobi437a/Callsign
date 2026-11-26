@@ -1,0 +1,30 @@
+# On foot next to a passer-by: hold E to stop them, tap E for the menu, ask for ID, run the name, let them go: the stop ends and cleans up.
+# Their reaction is rolled from hidden traits, so now and then they run or fight instead (rerun).
+mark scenario ped-stop
+god on
+tp 430 -1426 29
+onfoot
+wait 1000
+duty on
+wait 300
+ped
+wait 1000
+expect pedstop=none
+key E 700
+wait 1200
+expect busy=ped stop
+expect [stopped]
+key E
+wait 300
+expect [menu]
+pick id
+wait 500
+pick records
+wait 5500
+state
+pick release
+wait 1000
+expect busy=no
+expect pedstop=none
+expect scopes=0
+duty off

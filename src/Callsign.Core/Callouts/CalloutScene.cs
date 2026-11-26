@@ -46,8 +46,8 @@ namespace Callsign.Core.Callouts
     /// Suspects in a vehicle drive around until the player catches up: a calm driver pulls over
     /// for the player's lights, anyone else floors it, and a pursuit ends with everyone bailing out.
     /// Everything it spawns lives in its own entity scope.
-    /// A scene can also start around a vehicle that is already on the road (a traffic stop):
-    /// see <see cref="AroundVehicle"/>.
+    /// A scene can also start around a vehicle that is already on the road (a traffic stop, see
+    /// <see cref="AroundVehicle"/>) or a pedestrian the player stopped (see <see cref="AroundPed"/>).
     /// </summary>
     public sealed class CalloutScene
     {
@@ -116,11 +116,16 @@ namespace Callsign.Core.Callouts
         }
 
         CalloutScene(IVehicle vehicle, EntityScope scope, CalloutSceneServices services)
+            : this(vehicle.Position, scope, services)
+        {
+            _vehicle = vehicle;
+        }
+
+        CalloutScene(Position spot, EntityScope scope, CalloutSceneServices services)
         {
             _s = services;
             _scope = scope;
-            _vehicle = vehicle;
-            _spot = vehicle.Position;
+            _spot = spot;
         }
 
         /// <summary>
@@ -139,6 +144,21 @@ namespace Callsign.Core.Callouts
             scene.Current = Stage.Active;
             if (scene.Driver.Behaviour == SuspectBehaviour.Comply) scene.PullOver();
             else scene.StartPursuit();
+            return scene;
+        }
+
+        /// <summary>
+        /// A scene around a pedestrian the player has just stopped, already taken into
+        /// <paramref name="scope"/>. They react as <paramref name="behaviour"/> says.
+        /// </summary>
+        internal static CalloutScene AroundPed(IPed ped, SuspectProfile profile, SuspectBehaviour behaviour,
+            EntityScope scope, CalloutSceneServices services)
+        {
+            var scene = new CalloutScene(ped.Position, scope, services);
+            var suspect = new SceneSuspect(ped, profile, behaviour, -1, scope, services);
+            scene._suspects.Add(suspect);
+            scene.Current = Stage.Active;
+            suspect.StoppedOnFoot();
             return scene;
         }
 

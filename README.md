@@ -12,7 +12,7 @@ through a plugin API.
 > installed. Remove the files listed under [Uninstalling](#uninstalling) first.
 
 > **Early development.** Right now the mod has the on/off duty system, generated callouts
-> (on foot and in vehicles) with mid-call twists, traffic stops, stopping and questioning
+> (on foot and in vehicles) with mid-call twists, traffic stops, pedestrian stops, questioning
 > suspects, arrests and the plugin API. The career is being built. See [Roadmap](#roadmap).
 
 ---
@@ -40,10 +40,10 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 | `F7` | Go on / off duty. While on duty you can't get a wanted level, the game's own police are switched off, and story phone calls, texts and random events wait until you go off duty. |
 | `Y` / `N` | Accept / decline the call dispatch is offering. |
 | Hold `Shift` | Pull over the vehicle in front of you (on duty, emergency lights on). |
-| Hold `E` | Stop the suspect (on foot, close to them). |
+| Hold `E` | Stop the suspect, or on patrol any pedestrian in front of you (on foot, close to them). |
 | `E` | Open / close the interaction menu (standing next to a stopped suspect). |
 | `Up` / `Down`, `Enter`, `Backspace` | Move through the menu, choose, close. |
-| `End` | Call off the current callout or traffic stop. |
+| `End` | Call off the current callout, traffic stop or pedestrian stop. |
 | `F9` | Ask dispatch for a call right now. |
 | `F6` | Settings menu. |
 
@@ -54,6 +54,7 @@ with `E` and work out what they're hiding through the menu (ID, questions, recor
 pat-down), then arrest them or let them go. Arrested suspects ride in your back seat to the station.
 Between calls, turn on your lights behind any car and hold `Shift` to pull it over: run the plate,
 check the driver, then cite, warn or arrest. Most drivers stop; ones with something to hide may not.
+On foot, walk up to anyone and hold `E` to stop them for a chat: same menu, same hidden secrets.
 All built-in calls are listed in [docs/CALLOUTS.md](docs/CALLOUTS.md).
 
 ### Uninstalling

@@ -70,7 +70,7 @@ namespace Callsign.Core.Interaction
     /// Stopping a suspect on foot and dealing with them through a menu: ID, questions, a records
     /// check over the radio, breath and drug tests, a pat-down, then arrest or let go. The
     /// suspect's hidden traits decide the answers, and can make them run or fight. Used by
-    /// callouts now, ped stops later.
+    /// callouts, traffic stops and pedestrian stops.
     /// </summary>
     public sealed class SuspectInteraction
     {
@@ -209,13 +209,22 @@ namespace Callsign.Core.Interaction
                 Say("~r~Nope!~s~");
                 return Close(InteractionOutcome.Fled);
             }
+            StoppedByOfficer();
+            return null;
+        }
+
+        /// <summary>
+        /// The player has just stopped them and they went along with it (whoever started the stop
+        /// already rolled whether they would): they stop, face the officer and say something.
+        /// </summary>
+        public void StoppedByOfficer()
+        {
             Stopped = true;
             // A driver stays at the wheel and talks through the window until told to step out.
             _context = _suspect.InVehicle ? DialogueContext.InVehicle : DialogueContext.OnFoot;
             if (!_suspect.InVehicle) _suspect.FacePlayer();
             Say(_s.Dialogue.Say(DialogueTopic.Stopped, _profile, _context));
             _greeted = true;
-            return null;
         }
 
         IEnumerable<MenuItem> Items()

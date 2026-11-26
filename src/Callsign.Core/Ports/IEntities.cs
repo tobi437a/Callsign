@@ -162,6 +162,20 @@ namespace Callsign.Core.Ports
         bool TryTakeVehicleAhead(EntityScope scope, float maxDistance, out IVehicle? vehicle, out IReadOnlyList<IPed> occupants);
     }
 
+    /// <summary>The people walking around the player.</summary>
+    public interface IPedestrians
+    {
+        /// <summary>Someone <see cref="TryTakePedNearby"/> would take is there right now.</summary>
+        bool AnyoneToStop(float maxDistance);
+
+        /// <summary>
+        /// Takes over the pedestrian on foot closest in front of the player (within
+        /// <paramref name="maxDistance"/>; not police, not someone a mission or we already use)
+        /// into <paramref name="scope"/>. False if there is none.
+        /// </summary>
+        bool TryTakePedNearby(EntityScope scope, float maxDistance, out IPed? ped);
+    }
+
     /// <summary>Creates map markers into a scope.</summary>
     public interface IBlips
     {
