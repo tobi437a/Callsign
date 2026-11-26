@@ -2,23 +2,25 @@
 <!--
   Built-in callout parts. Incidents are drawn as situation x location x suspect x outcome.
   A situation only uses locations/suspects/outcomes that carry one of the tags it lists
-  (empty list = any). Locations are snapped to the nearest spot a ped can stand on, so
+  (empty list = any). intensity (0..1, default 0.3) is how big a call is: dispatch paces calls by it
+  (calm ones after intense calls, bigger ones after a quiet spell), and recently offered parts are
+  less likely to come up again. Locations are snapped to the nearest spot a ped can stand on, so
   coordinates only need to be close. Besides these, a street near the player (tags "street,public")
   is always a candidate location.
 -->
 <CalloutContent>
 
   <!-- Situations -->
-  <Situation id="suspicious-person" title="Suspicious person" locationTags="public,store" outcomeTags="calm,runs" weight="2">
+  <Situation id="suspicious-person" title="Suspicious person" intensity="0.15" locationTags="public,store" outcomeTags="calm,runs" weight="2">
     <Dispatch>Caller reports a {suspect} acting suspiciously near {location}.</Dispatch>
   </Situation>
-  <Situation id="shoplifting" title="Shoplifting" locationTags="store" outcomeTags="calm,runs,violent" weight="2">
+  <Situation id="shoplifting" title="Shoplifting" intensity="0.25" locationTags="store" outcomeTags="calm,runs,violent" weight="2">
     <Dispatch>Store staff report a shoplifter at {location}: {suspect}, left on foot.</Dispatch>
   </Situation>
-  <Situation id="disturbance" title="Disturbance" locationTags="public,store" suspectTags="rowdy" outcomeTags="calm,violent">
+  <Situation id="disturbance" title="Disturbance" intensity="0.3" locationTags="public,store" suspectTags="rowdy" outcomeTags="calm,violent">
     <Dispatch>Reports of a {suspect} shouting at passers-by near {location}.</Dispatch>
   </Situation>
-  <Situation id="armed-person" title="Person with a weapon" locationTags="public,street" suspectTags="armed" outcomeTags="calm,runs,violent" weight="0.7">
+  <Situation id="armed-person" title="Person with a weapon" intensity="0.6" locationTags="public,street" suspectTags="armed" outcomeTags="calm,runs,violent" weight="0.7">
     <Dispatch>Caller saw a {suspect} with a weapon near {location}. Approach with caution.</Dispatch>
   </Situation>
 

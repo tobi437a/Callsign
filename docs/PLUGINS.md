@@ -121,6 +121,9 @@ api.Callouts.AddLocation(new CalloutLocation(
   only suspects on foot.
 - Several suspects (since 0.4): set `MinSuspects` / `MaxSuspects` (up to 4) on the situation. Each
   suspect rolls their own outcome. `{count}` in the dispatch text becomes the number, as a word.
+- Pacing (since 0.5): set `Intensity` (0 to 1, default 0.3) on the situation. Dispatch sends calm
+  calls after intense ones and bigger ones after a quiet spell, and recently offered parts are less
+  likely to come up again, so you don't need to tune weights against repeats.
 - Your parts are removed when your plugin unloads.
 
 ## Compatibility

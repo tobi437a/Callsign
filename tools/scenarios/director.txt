@@ -1,0 +1,18 @@
+# Pacing director: an offered call is remembered (even when declined) and adds no tension;
+# a call that was taken and then called off does add some. Ends off duty.
+mark scenario director
+duty on
+wait 300
+expect director=[tension=0.00
+call shoplifting
+expect recent=shoplifting
+decline
+expect director=[tension=0.00
+call suspicious-person
+expect recent=suspicious-person,shoplifting
+accept
+wait 500
+cancel
+wait 300
+expect! director=[tension=0.00
+duty off

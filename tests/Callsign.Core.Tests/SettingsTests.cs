@@ -97,6 +97,35 @@ public class SettingsTests
         Assert.False(menu.IsOpen);
     }
 
+    sealed class FakePlayerVehicle : IPlayerVehicle
+    {
+        public bool Available { get; set; }
+        public int Repairs;
+        public bool Repair() { if (!Available) return false; Repairs++; return true; }
+    }
+
+    [Fact]
+    public void RepairIsOnlyOfferedWithAVehicleNearby()
+    {
+        var vehicle = new FakePlayerVehicle();
+        var notifier = new FakeNotifier();
+        var menu = new SettingsMenu([new VehicleSettingsPage(vehicle, notifier)]);
+        menu.Open();
+        menu.Tick(Select);                      // open "Vehicle"
+        Assert.Equal("Vehicle", menu.Menu.Title);
+
+        Assert.False(menu.Menu.Items[0].Enabled);
+        menu.Tick(Select);
+        Assert.Equal(0, vehicle.Repairs);
+
+        vehicle.Available = true;
+        menu.Tick(default);                     // items refresh every tick
+        Assert.True(menu.Menu.Items[0].Enabled);
+        menu.Tick(Select);
+        Assert.Equal(1, vehicle.Repairs);
+        Assert.Contains(notifier.Messages, m => m.Contains("repaired"));
+    }
+
     [Fact]
     public void SettingsFileRoundTripsAndSurvivesABrokenFile()
     {

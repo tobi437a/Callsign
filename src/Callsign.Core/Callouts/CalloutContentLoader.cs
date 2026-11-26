@@ -73,6 +73,7 @@ namespace Callsign.Core.Callouts
                         InVehicle = s.Vehicle,
                         MinSuspects = s.MinSuspects,
                         MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
+                        Intensity = s.Intensity,
                     });
                 });
             foreach (var l in content.Locations)
@@ -144,6 +145,8 @@ namespace Callsign.Core.Callouts
         [XmlAttribute("minSuspects")] public int MinSuspects { get; set; } = 1;
         /// <summary>0 (not set) = same as <see cref="MinSuspects"/>.</summary>
         [XmlAttribute("maxSuspects")] public int MaxSuspects { get; set; }
+        /// <summary>0..1, see <see cref="SituationPart.Intensity"/>.</summary>
+        [XmlAttribute("intensity")] public double Intensity { get; set; } = SituationPart.DefaultIntensity;
         [XmlElement("Dispatch")] public string? Dispatch { get; set; }
     }
 

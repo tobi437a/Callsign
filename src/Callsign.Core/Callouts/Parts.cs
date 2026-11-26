@@ -60,6 +60,14 @@ namespace Callsign.Core.Callouts
         /// <summary>Most suspects (up to <see cref="SuspectLimit"/>).</summary>
         public int MaxSuspects { get; init; } = 1;
 
+        /// <summary>
+        /// 0..1: how big a call this is (0.15 suspicious person, 0.9 shots fired). The director pairs calm
+        /// calls with tense shifts and big ones with quiet spells.
+        /// </summary>
+        public double Intensity { get; init; } = DefaultIntensity;
+
+        public const double DefaultIntensity = 0.3;
+
         public bool Fits(LocationPart location) => TagMatch.Any(LocationTags, location.Tags);
         public bool Fits(SuspectPart suspect) => suspect.InVehicle == InVehicle && TagMatch.Any(SuspectTags, suspect.Tags);
         public bool Fits(OutcomePart outcome) => TagMatch.Any(OutcomeTags, outcome.Tags);
@@ -70,6 +78,7 @@ namespace Callsign.Core.Callouts
             Require.Text(Dispatch, "dispatch text");
             if (MinSuspects < 1 || MaxSuspects < MinSuspects || MaxSuspects > SuspectLimit)
                 throw new ArgumentException("suspect count must be 1.." + SuspectLimit + " with min <= max");
+            if (!(Intensity >= 0 && Intensity <= 1)) throw new ArgumentException("intensity must be 0..1");
         }
     }
 

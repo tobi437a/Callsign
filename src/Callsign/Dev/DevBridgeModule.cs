@@ -7,6 +7,7 @@ using GTA;
 using GTA.Math;
 using GTA.Native;
 using Callsign.Core.Callouts;
+using Callsign.Core.Director;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
@@ -29,11 +30,12 @@ namespace Callsign.Dev
     {
         public const string Help =
             "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
-            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
+            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | damage | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
         readonly CalloutService _callouts;
+        readonly PacingDirector _director;
         readonly TrafficStopService _stops;
         readonly SettingsMenu _settings;
         readonly EntityScopes _scopes;
@@ -46,12 +48,13 @@ namespace Callsign.Dev
         readonly List<(Vector3 At, System.Drawing.Color Color)> _markers = new List<(Vector3, System.Drawing.Color)>();
         int _nextPoll;
 
-        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
+        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, PacingDirector director, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
         {
             _settings = settings;
             _dir = dir;
             _duty = duty;
             _callouts = callouts;
+            _director = director;
             _stops = stops;
             _scopes = scopes;
             _input = input;
@@ -306,6 +309,12 @@ namespace Callsign.Dev
                     Vehicle v = player.CurrentVehicle ?? throw new InvalidOperationException("not in a vehicle");
                     v.IsSirenActive = arg(1) == "on";
                     return v.IsSirenActive ? "lights on" : "lights off";
+                case "damage":   // wreck the player's vehicle a bit (smoking engine, dented body, a flat tyre)
+                    Vehicle wreck = player.CurrentVehicle ?? throw new InvalidOperationException("not in a vehicle");
+                    wreck.EngineHealth = 250;
+                    wreck.BodyHealth = 300;
+                    wreck.Wheels[VehicleWheelBoneId.WheelLeftFront].Burst();
+                    return "engine=" + wreck.EngineHealth.ToString("0");
                 case "god":
                     player.IsInvincible = arg(1) == "on";
                     return player.IsInvincible ? "invincible" : "mortal";
@@ -322,11 +331,12 @@ namespace Callsign.Dev
             Vehicle? v = p.CurrentVehicle;
             return "duty=" + (_duty.OnDuty ? "on" : "off")
                 + " player=" + Fmt(p.Position) + (p.IsDead ? " DEAD" : "")
-                + (v != null ? " in=" + v.DisplayName + (v.IsSirenActive ? "+lights" : "") + " " + v.Speed.ToString("0") + "m/s" : " onfoot")
+                + (v != null ? " in=" + v.DisplayName + (v.IsSirenActive ? "+lights" : "") + " " + v.Speed.ToString("0") + "m/s engine=" + v.EngineHealth.ToString("0") : " onfoot")
                 + " scopes=" + _scopes.OpenCount
                 + " busy=" + (_duty.Activity ?? "no")
                 + " callout=" + _callouts.Describe()
                 + " stop=" + _stops.Describe()
+                + " director=[" + _director.Describe() + "]"
                 + " settings=" + (_settings.IsOpen ? "[" + _settings.Menu.Title + ": " + string.Join(",", _settings.Menu.Items.Select(i => i.Id + (i.Value != null ? "=" + i.Value.Replace("~g~", "").Replace("~r~", "") : ""))) + "]" : "closed");
         }
 

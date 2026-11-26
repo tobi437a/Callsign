@@ -10,19 +10,19 @@
 <CalloutContent>
 
   <!-- Situations -->
-  <Situation id="stolen-vehicle" title="Stolen vehicle" vehicle="true" minSuspects="1" maxSuspects="2" locationTags="road,street"
+  <Situation id="stolen-vehicle" title="Stolen vehicle" intensity="0.5" vehicle="true" minSuspects="1" maxSuspects="2" locationTags="road,street"
              outcomeTags="calm,runs,violent" suspectTags="thief" weight="1.5">
     <Dispatch>Tracker hit on a stolen {suspect} near {location}. Locate and stop the vehicle.</Dispatch>
   </Situation>
-  <Situation id="drunk-driver" title="Possible drunk driver" vehicle="true" locationTags="road,street"
+  <Situation id="drunk-driver" title="Possible drunk driver" intensity="0.4" vehicle="true" locationTags="road,street"
              outcomeTags="calm,runs" suspectTags="dui" weight="1.5">
     <Dispatch>Callers report a {suspect} swerving across lanes near {location}. Possible DUI.</Dispatch>
   </Situation>
-  <Situation id="shots-from-vehicle" title="Shots fired from a vehicle" vehicle="true" minSuspects="2" maxSuspects="3" locationTags="road,street"
+  <Situation id="shots-from-vehicle" title="Shots fired from a vehicle" intensity="0.9" vehicle="true" minSuspects="2" maxSuspects="3" locationTags="road,street"
              outcomeTags="runs,violent" suspectTags="gang" weight="0.6">
     <Dispatch>Shots fired from a {suspect} near {location}, {count} armed occupants. Approach with caution.</Dispatch>
   </Situation>
-  <Situation id="armed-robbery" title="Armed robbery" minSuspects="1" maxSuspects="2"
+  <Situation id="armed-robbery" title="Armed robbery" intensity="0.8" minSuspects="1" maxSuspects="2"
              locationTags="store" outcomeTags="calm,runs,violent" suspectTags="robber" weight="1.5">
     <Dispatch>Silent alarm at {location}: armed robbery in progress. Staff report {count} suspect(s) {suspect}.</Dispatch>
   </Situation>

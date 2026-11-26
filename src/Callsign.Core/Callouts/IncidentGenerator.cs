@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Callsign.Core.Director;
 using Callsign.Core.Ports;
 using Callsign.Core.World;
 
@@ -39,20 +40,25 @@ namespace Callsign.Core.Callouts
 
     /// <summary>
     /// Assembles incidents from the registered parts: picks a situation that has at least one
-    /// fitting location in range, suspect and outcome, then picks each of those by weight.
+    /// fitting location in range, suspect and outcome, then picks each of those by weight
+    /// (times the director's factor: pacing and anti-repeat).
     /// </summary>
     public sealed class IncidentGenerator
     {
         readonly CalloutParts _parts;
         readonly IRandom _random;
         readonly Func<SituationPart, bool> _isEnabled;
+        readonly IDispatchDirector _director;
 
         /// <param name="isEnabled">Situations the player has switched off return false (settings). Default: all on.</param>
-        public IncidentGenerator(CalloutParts parts, IRandom random, Func<SituationPart, bool>? isEnabled = null)
+        /// <param name="director">Tilts the weights. Default: plain weights.</param>
+        public IncidentGenerator(CalloutParts parts, IRandom random, Func<SituationPart, bool>? isEnabled = null,
+            IDispatchDirector? director = null)
         {
             _parts = parts;
             _random = random;
             _isEnabled = isEnabled ?? (_ => true);
+            _director = director ?? NoDirector.Instance;
         }
 
         /// <param name="player">Where the player is now.</param>
@@ -76,17 +82,19 @@ namespace Callsign.Core.Callouts
                             && _parts.Outcomes.All.Any(o => s.Fits(o) && o.Weight > 0))
                 .ToList();
 
-            if (!Weighted.TryPick(situations, s => s.Weight, _random, out SituationPart situation)) return null;
-            if (!Weighted.TryPick(locations.Where(situation.Fits).ToList(), l => l.Weight, _random, out LocationPart location)) return null;
-            if (!Weighted.TryPick(_parts.Suspects.All.Where(p => situation.Fits(p) && p.Models.Count > 0).ToList(), p => p.Weight, _random, out SuspectPart suspect)) return null;
+            if (!Weighted.TryPick(situations, s => s.Weight * _director.Factor(s), _random, out SituationPart situation)) return null;
+            if (!Weighted.TryPick(locations.Where(situation.Fits).ToList(), l => l.Weight * _director.Factor(l), _random, out LocationPart location)) return null;
+            if (!Weighted.TryPick(_parts.Suspects.All.Where(p => situation.Fits(p) && p.Models.Count > 0).ToList(),
+                    p => p.Weight * _director.Factor(p), _random, out SuspectPart suspect)) return null;
             var outcomes = _parts.Outcomes.All.Where(situation.Fits).ToList();
-            if (!Weighted.TryPick(outcomes, o => o.Weight, _random, out OutcomePart outcome)) return null;
+            if (!Weighted.TryPick(outcomes, o => o.Weight * _director.Factor(o), _random, out OutcomePart outcome)) return null;
 
             var rolls = new List<SuspectRoll> { new SuspectRoll(PickModel(suspect), outcome) };
             int count = situation.MaxSuspects <= situation.MinSuspects ? situation.MinSuspects
                 : situation.MinSuspects + _random.Next(situation.MaxSuspects - situation.MinSuspects + 1);
             while (rolls.Count < count)
             {
+                // Plain weights: a group mixing reactions is fine; only repeats across calls are pushed down.
                 Weighted.TryPick(outcomes, o => o.Weight, _random, out OutcomePart other);   // can't fail: one was picked above
                 rolls.Add(new SuspectRoll(PickModel(suspect), other));
             }
