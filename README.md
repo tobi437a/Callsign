@@ -91,7 +91,8 @@ with the built-in calls. Built-in content uses the same API.
 - [x] Traffic stops
 - [ ] Pedestrian stops
 - [ ] Pacing director: calm after chaos, no repeats back-to-back
-- [ ] Career: rookie with a field training officer → Officer → Senior Officer → Sergeant → specialisations
+- [ ] Pick a mode on every start: **Career** or **Free patrol** (everything unlocked)
+- [ ] Career: rookie in Los Santos with a field training officer → Officer → Senior Officer → Sergeant → specialisations
 - [ ] Backup and support units, pursuit tactics, investigations
 
 ## Building from source
