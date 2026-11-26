@@ -21,6 +21,16 @@ namespace Callsign.Core.Suspects
         /// <summary>Carries drugs, if they are on drugs.</summary>
         public double CarryingDrugsIfUsing { get; set; } = 0.4;
         public double ConcealedWeapon { get; set; } = 0.08;
+        /// <summary>A user has taken a second substance on top of the first.</summary>
+        public double SecondDrug { get; set; } = 0.2;
+        /// <summary>A user carries one of the drugs they took (rather than any drug).</summary>
+        public double CarriesWhatTheyUse { get; set; } = 0.8;
+        /// <summary>How common each drug is among users (relative weights).</summary>
+        public double Cannabis { get; set; } = 45;
+        public double Cocaine { get; set; } = 20;
+        public double Methamphetamine { get; set; } = 15;
+        public double Opiates { get; set; } = 10;
+        public double Benzodiazepines { get; set; } = 10;
         /// <summary>Nervous, with something to hide (warrant, drugs, weapon).</summary>
         public double NervousIfHiding { get; set; } = 0.7;
         public double NervousOtherwise { get; set; } = 0.2;
@@ -79,6 +89,13 @@ namespace Callsign.Core.Suspects
                 : null;
             if (weapon == null) traits &= ~SuspectTraits.ConcealedWeapon;
 
+            Drug drugs = Drug.None;
+            if (using_)
+            {
+                drugs = PickDrug(Drug.None);
+                if (_random.NextDouble() < _chances.SecondDrug) drugs |= PickDrug(drugs);
+            }
+
             var pockets = new List<string>();
             int everyday = _random.Next(0, 3);
             for (int i = 0; i < everyday && _content.PocketItems.Count > 0; i++)
@@ -86,10 +103,43 @@ namespace Callsign.Core.Suspects
                 string item = Pick(_content.PocketItems)!;
                 if (!pockets.Contains(item)) pockets.Add(item);
             }
-            if ((traits & SuspectTraits.CarryingDrugs) != 0 && _content.DrugItems.Count > 0) pockets.Add(Pick(_content.DrugItems)!);
+            if ((traits & SuspectTraits.CarryingDrugs) != 0 && _content.DrugItems.Count > 0) pockets.Add(PickDrugItem(drugs).Name);
             if (weapon != null) pockets.Add(weapon.Name);
 
-            return new SuspectProfile(real, stated, traits, bac, offence, weapon?.Weapon, weapon?.Name, pockets);
+            return new SuspectProfile(real, stated, traits, bac, offence, weapon?.Weapon, weapon?.Name, pockets, drugs);
+        }
+
+        /// <summary>A drug by how common it is, other than those in <paramref name="taken"/> (None if all are).</summary>
+        Drug PickDrug(Drug taken)
+        {
+            var options = DrugPanel.All.Where(d => (taken & d) == 0).Select(d => (d, Weight(d))).Where(o => o.Item2 > 0).ToList();
+            double total = options.Sum(o => o.Item2);
+            if (total <= 0) return taken == Drug.None ? Drug.Cannabis : Drug.None;
+            double roll = _random.NextDouble() * total;
+            foreach (var (drug, weight) in options)
+            {
+                if (roll < weight) return drug;
+                roll -= weight;
+            }
+            return options[options.Count - 1].d;
+        }
+
+        double Weight(Drug d) => d switch
+        {
+            Drug.Cannabis => _chances.Cannabis,
+            Drug.Cocaine => _chances.Cocaine,
+            Drug.Methamphetamine => _chances.Methamphetamine,
+            Drug.Opiates => _chances.Opiates,
+            Drug.Benzodiazepines => _chances.Benzodiazepines,
+            _ => 0,
+        };
+
+        /// <summary>A user usually carries what they took; anyone else carries anything.</summary>
+        DrugItem PickDrugItem(Drug taken)
+        {
+            var theirs = _content.DrugItems.Where(i => (i.Drug & taken) != 0).ToList();
+            var pool = theirs.Count > 0 && _random.NextDouble() < _chances.CarriesWhatTheyUse ? theirs : _content.DrugItems;
+            return pool[_random.Next(pool.Count)];
         }
 
         static SuspectTraits Forced(IReadOnlyList<string> tags)

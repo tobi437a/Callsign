@@ -38,6 +38,9 @@ public class SuspectProfileTests
               <Line topic="Weather">Nice day.</Line>
               <Line topic="Purpose" trait="Grumpy">Hmph.</Line>
               <HiddenWeapon name="a thing" />
+              <DrugItem drug="Cocaine" name="a wrap" />
+              <DrugItem drug="Glue" name="a tube" />
+              <DrugItems>a bag, a pill</DrugItems>
             </SuspectContent>
             """;
 
@@ -45,7 +48,8 @@ public class SuspectProfileTests
 
         Assert.Equal(["Al", "Bob", "Cy"], content.MaleNames);
         Assert.Single(content.Lines);
-        Assert.Equal(3, log.Problems.Count);
+        Assert.Equal([new DrugItem("a bag", Drug.None), new DrugItem("a pill", Drug.None), new DrugItem("a wrap", Drug.Cocaine)], content.DrugItems);
+        Assert.Equal(4, log.Problems.Count);
     }
 
     [Fact]
@@ -79,8 +83,33 @@ public class SuspectProfileTests
             if (p.Has(SuspectTraits.FalseName)) Assert.True(p.Has(SuspectTraits.NoId));
             else Assert.Equal(p.Real, p.Stated);
             Assert.Equal(p.Has(SuspectTraits.Intoxicated), p.OverAlcoholLimit);
+            Assert.Equal(p.Has(SuspectTraits.OnDrugs), p.Drugs != Drug.None);
             Assert.InRange(p.Real.Age, 18, 65);
         }
+    }
+
+    [Fact]
+    public void UsersTestPositiveForOneOrTwoDrugsAndMostlyCarryWhatTheyTook()
+    {
+        var chances = new TraitChances { OnDrugs = 1, CarryingDrugsIfUsing = 1 };
+        var generator = new SuspectProfileGenerator(Shipped(), new SeededRandom(7), chances);
+        var seen = Drug.None;
+        int matching = 0, twoDrugs = 0;
+        const int n = 1000;
+
+        for (int i = 0; i < n; i++)
+        {
+            SuspectProfile p = generator.Generate(true, [], false);
+            int count = DrugPanel.In(p.Drugs).Count();
+            Assert.InRange(count, 1, 2);
+            if (count == 2) twoDrugs++;
+            seen |= p.Drugs;
+            if (Shipped().DrugItems.Any(d => (d.Drug & p.Drugs) != 0 && p.Pockets.Contains(d.Name))) matching++;
+        }
+
+        Assert.Equal(DrugPanel.All.Aggregate(Drug.None, (a, d) => a | d), seen);
+        Assert.InRange(twoDrugs, 120, 280);
+        Assert.InRange(matching, 750, 950);
     }
 
     [Fact]
