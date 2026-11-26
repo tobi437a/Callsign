@@ -28,7 +28,7 @@ namespace Callsign.Dev
     {
         public const string Help =
             "ping | state | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
-            + "| traffic [model] | stop | onfoot | pick <menuItemId> | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
+            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
@@ -39,6 +39,9 @@ namespace Callsign.Dev
         readonly ILog _log;
         readonly List<(string Id, string[] Args)> _queue = new List<(string, string[])>();
         int _waitUntil;
+        Camera? _cam;
+        /// <summary>Points drawn as coloured markers every frame ("sides"), to see where road lookups land.</summary>
+        readonly List<(Vector3 At, System.Drawing.Color Color)> _markers = new List<(Vector3, System.Drawing.Color)>();
         int _nextPoll;
 
         public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, EntityScopes scopes, KeyInput input, ILog log)
@@ -61,6 +64,9 @@ namespace Callsign.Dev
 
         public void Tick()
         {
+            foreach (var m in _markers)
+                World.DrawMarker(MarkerType.VerticalCylinder, m.At - new Vector3(0, 0, 1), Vector3.Zero, Vector3.Zero,
+                    new Vector3(0.6f, 0.6f, 3f), m.Color);
             int now = Environment.TickCount;
             if (now - _nextPoll >= 0)
             {
@@ -82,7 +88,21 @@ namespace Callsign.Dev
             if (id != "-") File.AppendAllText(ResultsFile, id + " " + line + Environment.NewLine);
         }
 
-        public void Stop() { }
+        public void Stop() => CamOff();
+
+        void CamOff()
+        {
+            if (_cam == null) return;
+            World.RenderingCamera = null;
+            _cam.Delete();
+            _cam = null;
+        }
+
+        Vector3 SceneFocus()
+        {
+            CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? throw new InvalidOperationException("no scene");
+            return new Vector3(scene.Focus.X, scene.Focus.Y, scene.Focus.Z);
+        }
 
         void ReadCommands()
         {
@@ -161,6 +181,71 @@ namespace Callsign.Dev
                     var keys = Enumerable.Repeat(new[] { "key", "Down" }, steps).Append(new[] { "key", "Return" });
                     _queue.InsertRange(0, keys.Select(k => ("-", k)));
                     return menu.Items[target].Label;
+                case "nodes":   // road node flags straight ahead of the player's vehicle, every 10 m
+                    Entity from = (Entity?)player.CurrentVehicle ?? player;
+                    var sb = new System.Text.StringBuilder();
+                    for (int d = 0; d <= 80; d += 10)
+                    {
+                        Vector3 q = from.Position + from.ForwardVector * d;
+                        var dens = new OutputArgument(); var fl = new OutputArgument();
+                        bool ok = Function.Call<bool>(Hash.GET_VEHICLE_NODE_PROPERTIES, q.X, q.Y, q.Z, dens, fl);
+                        sb.Append(d + "m:" + (ok ? fl.GetResult<int>().ToString() : "-") + " ");
+                    }
+                    return sb.ToString();
+                case "sides":   // where the road-side lookups put a spot 30 m ahead (markers: red boundary, green/blue/yellow by-side -1/0/1, white node)
+                    _markers.Clear();
+                    if (arg(1) == "off") return "";
+                    Entity src = (Entity?)player.CurrentVehicle ?? player;
+                    Vector3 ahead2 = src.Position + src.ForwardVector * float.Parse(a.Length > 1 ? arg(1) : "30", CultureInfo.InvariantCulture);
+                    var res = new System.Text.StringBuilder();
+                    string Lat(Vector3 p) => Vector3.Dot(p - ahead2, src.RightVector).ToString("0.0", CultureInfo.InvariantCulture);
+                    var nOut = new OutputArgument(); var hOut = new OutputArgument();
+                    if (Function.Call<bool>(Hash.GET_CLOSEST_VEHICLE_NODE_WITH_HEADING, ahead2.X, ahead2.Y, ahead2.Z, nOut, hOut, 1, 3f, 0))
+                    {
+                        Vector3 n = nOut.GetResult<Vector3>();
+                        _markers.Add((n, System.Drawing.Color.White));
+                        res.Append("node lat " + Lat(n) + " hdg " + hOut.GetResult<float>().ToString("0") + " (car " + src.Heading.ToString("0") + ") ");
+                    }
+                    var bOut = new OutputArgument();
+                    if (Function.Call<bool>(Hash.GET_ROAD_BOUNDARY_USING_HEADING, ahead2.X, ahead2.Y, ahead2.Z, src.Heading, bOut))
+                    {
+                        Vector3 b2 = bOut.GetResult<Vector3>();
+                        _markers.Add((b2, System.Drawing.Color.Red));
+                        res.Append("| boundary lat " + Lat(b2) + " ");
+                    }
+                    var colors = new[] { System.Drawing.Color.Lime, System.Drawing.Color.Blue, System.Drawing.Color.Yellow };
+                    for (int side = -1; side <= 1; side++)
+                    {
+                        var sOut = new OutputArgument();
+                        if (Function.Call<bool>(Hash.GET_POSITION_BY_SIDE_OF_ROAD, ahead2.X, ahead2.Y, ahead2.Z, side, sOut))
+                        {
+                            Vector3 sp = sOut.GetResult<Vector3>();
+                            _markers.Add((sp, colors[side + 1]));
+                            res.Append("| side" + side + " lat " + Lat(sp) + " ");
+                        }
+                        else res.Append("| side" + side + " none ");
+                    }
+                    return res.ToString();
+                case "pullinfo":
+                    Vehicle? pv = World.GetClosestVehicle(SceneFocus(), 4f);
+                    return GamePed.PullOverDebug + " | car to spot " + (pv == null ? "?" : pv.Position.DistanceTo2D(GamePed.LastPullOverSpot).ToString("0.0", CultureInfo.InvariantCulture)) + "m";
+                case "kerb":   // how far the scene's vehicle stands from the right-hand road edge (centre to edge)
+                    Vehicle sv = World.GetClosestVehicle(SceneFocus(), 4f) ?? throw new InvalidOperationException("no vehicle at the scene");
+                    var edge = new OutputArgument();
+                    if (!Function.Call<bool>(Hash.GET_ROAD_BOUNDARY_USING_HEADING, sv.Position.X, sv.Position.Y, sv.Position.Z, sv.Heading, edge))
+                        return "no road edge found";
+                    Vector3 e = edge.GetResult<Vector3>();
+                    float lateral = Vector3.Dot(e - sv.Position, sv.RightVector);
+                    return "edge " + lateral.ToString("0.0", CultureInfo.InvariantCulture) + "m to the right"
+                        + (Function.Call<bool>(Hash.IS_POINT_ON_ROAD, sv.Position.X, sv.Position.Y, sv.Position.Z, sv) ? "" : " (off road)");
+                case "cam":    // "cam" = bird's-eye view over the scene; "cam off" = back to normal
+                    CamOff();
+                    if (arg(1) == "off") return "";
+                    Vector3 f = arg(1) == "me" ? player.Position + player.ForwardVector * 20f : SceneFocus();
+                    _cam = World.CreateCamera(f + new Vector3(0, -6, 22), Vector3.Zero, 50f);
+                    _cam.PointAt(f);
+                    World.RenderingCamera = _cam;
+                    return Fmt(f);
                 case "stop": return Check(_stops.TryStart(), "no traffic stop started");
 
                 case "key":
@@ -198,7 +283,10 @@ namespace Callsign.Dev
                     if (!model.IsVehicle) throw new ArgumentException("not a vehicle: " + modelName);
                     if (!model.Request(5000)) throw new InvalidOperationException("model didn't load");   // dev tool: blocking is fine here
                     player.CurrentVehicle?.Delete();
-                    Vehicle car = World.CreateVehicle(model, player.Position + player.ForwardVector * 3, player.Heading);
+                    // On the nearest road, facing the way traffic drives there.
+                    Vector3 road = World.GetNextPositionOnStreetWithHeading(player.Position, out float roadHeading, false);
+                    if (road == Vector3.Zero) { road = player.Position + player.ForwardVector * 3; roadHeading = player.Heading; }
+                    Vehicle car = World.CreateVehicle(model, road, roadHeading);
                     model.MarkAsNoLongerNeeded();
                     player.SetIntoVehicle(car, VehicleSeat.Driver);
                     car.MarkAsNoLongerNeeded();

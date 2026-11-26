@@ -259,12 +259,15 @@ namespace Callsign.Core.Callouts
                         // Stopped for a moment, not just slowing down on the way to the kerb.
                         if (_vehicle.Speed > settings.StoppedSpeed) { _slowSince = -1; return; }
                         if (_slowSince < 0) _slowSince = _s.Clock.NowMs;
-                        if (_s.Clock.NowMs - _slowSince < settings.PulledOverMs) return;
+                        long slowFor = _s.Clock.NowMs - _slowSince;
+                        if (slowFor < (Driver.Ped.AtPullOverSpot ? settings.PulledOverMs : settings.PulledOverStuckMs)) return;
                     }
                     Vehicle = VehicleStage.Stopped;
                     Driver.Ped.WaitInVehicle();
                     _s.Notifier.Notify("The vehicle has ~g~stopped~s~. Approach the driver on foot.");
                     foreach (SceneSuspect x in Seated.ToList()) x.Engage();
+                    // Pulled over is stopped: the calm ones wait to be talked to, no need to stop them again.
+                    foreach (SceneSuspect x in _suspects.Where(x => x.Current == SceneSuspect.State.Calm)) x.Interaction.PulledOver();
                     return;
 
                 case VehicleStage.Pursuit:
@@ -388,7 +391,7 @@ namespace Callsign.Core.Callouts
 
             // At a traffic stop the passengers aren't suspects: once the driver may go, calm ones go with them.
             if (_incident == null && (Driver.Result == SuspectResult.Released || Driver.Result == SuspectResult.Cited))
-                foreach (SceneSuspect x in _suspects.Where(x => x.Current == SceneSuspect.State.Calm && !x.Interaction.Stopped))
+                foreach (SceneSuspect x in _suspects.Where(x => x.Current == SceneSuspect.State.Calm && !x.Interaction.Questioned))
                     Finished(x, x.LeaveWithDriver);
         }
 

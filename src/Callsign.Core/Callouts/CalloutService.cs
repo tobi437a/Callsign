@@ -27,6 +27,7 @@ namespace Callsign.Core.Callouts
         readonly CalloutSceneServices _services;
         long _nextOfferAt;
         long _offerExpiresAt;
+        bool _heldWhileBusy;
         CalloutScene? _scene;
 
         public CalloutService(IncidentGenerator generator, DutyService duty, IEventBus bus, IClock clock,
@@ -62,8 +63,15 @@ namespace Callsign.Core.Callouts
                     Schedule(Settings.FirstOfferMinMs, Settings.FirstOfferMaxMs);
                     break;
                 case Phase.Waiting:
-                    // Busy with something else (a traffic stop): dispatch holds calls until the officer is free.
-                    if (_clock.NowMs >= _nextOfferAt && !_duty.Busy) TryOffer();
+                    // Busy with something else (a traffic stop): no calls meanwhile, and once the officer
+                    // is free, the usual gap before the next one, as after a call.
+                    if (_duty.Busy) _heldWhileBusy = true;
+                    else if (_heldWhileBusy)
+                    {
+                        _heldWhileBusy = false;
+                        Schedule(Settings.NextOfferMinMs, Settings.NextOfferMaxMs);
+                    }
+                    else if (_clock.NowMs >= _nextOfferAt) TryOffer();
                     break;
                 case Phase.Offered:
                     if (_clock.NowMs >= _offerExpiresAt)

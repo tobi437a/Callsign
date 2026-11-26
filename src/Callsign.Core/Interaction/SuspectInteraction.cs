@@ -89,6 +89,8 @@ namespace Callsign.Core.Interaction
         readonly Menu _menu = new Menu("Suspect");
         bool _menuOpen;
         bool _ranOnce;
+        /// <summary>Held by a traffic stop: doesn't leave when the player walks off, and speaks when first talked to.</summary>
+        bool _held, _greeted;
         Identity? _knownName;
         string? _recordsResult, _breathResult, _drugResult, _plateResult;
         Check _pending;
@@ -114,6 +116,20 @@ namespace Callsign.Core.Interaction
 
         /// <summary>The vehicle they were driving, if any: adds a plate check and a citation to the menu.</summary>
         public VehicleRecord? Vehicle { get; set; }
+
+        /// <summary>The player has opened the menu on them at least once.</summary>
+        public bool Questioned { get; private set; }
+
+        /// <summary>
+        /// Their vehicle was pulled over: they count as stopped already (no need to hold the key),
+        /// wait in their seat whatever the distance, and greet the officer when first talked to.
+        /// </summary>
+        public void PulledOver()
+        {
+            Stopped = true;
+            _held = true;
+            _context = DialogueContext.InVehicle;
+        }
 
         /// <summary>The suspect gave up (e.g. caught after running): they stay put; no new escape attempts.</summary>
         public void Surrendered()
@@ -143,7 +159,7 @@ namespace Callsign.Core.Interaction
 
             if (_pending != Check.None && _s.Clock.NowMs >= _pendingDoneAt) FinishCheck();
 
-            if (distance > _s.Settings.WalkAwayDistance)
+            if (!_held && distance > _s.Settings.WalkAwayDistance)
             {
                 // The player left them standing: they go on their way.
                 Stopped = false;
@@ -157,7 +173,13 @@ namespace Callsign.Core.Interaction
             if (!_menuOpen)
             {
                 if (!inReach) return null;
-                if (input.Interact) _menuOpen = true;
+                if (input.Interact)
+                {
+                    _menuOpen = true;
+                    Questioned = true;
+                    if (!_greeted) Say(_s.Dialogue.Say(DialogueTopic.Stopped, _profile, _context));
+                    _greeted = true;
+                }
                 else
                 {
                     _s.Notifier.Help(TalkHelp);
@@ -191,6 +213,7 @@ namespace Callsign.Core.Interaction
             _context = _suspect.InVehicle ? DialogueContext.InVehicle : DialogueContext.OnFoot;
             if (!_suspect.InVehicle) _suspect.FacePlayer();
             Say(_s.Dialogue.Say(DialogueTopic.Stopped, _profile, _context));
+            _greeted = true;
             return null;
         }
 
@@ -370,6 +393,7 @@ namespace Callsign.Core.Interaction
             _menuOpen = false;
             _pending = Check.None;
             Stopped = false;
+            _held = false;
             if (outcome == InteractionOutcome.Fled || outcome == InteractionOutcome.Attacked) _ranOnce = true;
             return outcome;
         }

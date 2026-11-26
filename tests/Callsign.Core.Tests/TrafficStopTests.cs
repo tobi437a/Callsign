@@ -98,6 +98,7 @@ public class TrafficStopServiceTests
         FakePed driver = _traffic.Occupants[0];
         Assert.Equal("pullover", driver.Order);
         car.Speed = 0;
+        driver.AtPullOverSpot = true;
         Tick();
         Advance(_calloutSettings.PulledOverMs);
         Assert.Equal("waiting", driver.Order);
@@ -109,8 +110,7 @@ public class TrafficStopServiceTests
         _world.PlayerOnFoot = true;
         _world.PlayerInVehicle = false;
         _world.PlayerPosition = driver.Position with { X = driver.Position.X - 2 };
-        Tick(stop: true);
-        Tick(interact: true);
+        Tick(interact: true);   // a pulled-over driver is already stopped: no need to hold the key
         Assert.NotNull(_menu.Last);
     }
 
@@ -182,6 +182,30 @@ public class TrafficStopServiceTests
         Assert.False(_duty.Busy);
         Assert.Equal(0, _scopes.OpenCount);
         Assert.Equal(ReleaseMode.Dismiss, car.Released);
+    }
+
+    [Fact]
+    public void ACarThatCantReachTheKerbStillCountsAsStoppedAfterAWhile()
+    {
+        FakeVehicle car = Patrol();
+        Tick(initiate: true);
+        FakePed driver = _traffic.Occupants[0];
+        car.Speed = 0;
+        Tick();
+        Advance(_calloutSettings.PulledOverMs);
+        Assert.Equal("pullover", driver.Order);
+        Advance(_calloutSettings.PulledOverStuckMs);
+        Assert.Equal("waiting", driver.Order);
+    }
+
+    [Fact]
+    public void ThePulledOverDriverWaitsWhileYouGoBackToYourCar()
+    {
+        FakePed driver = PullOverAndStop(Patrol());
+        _world.PlayerPosition = driver.Position with { X = driver.Position.X - 40 };
+        Advance(10_000);
+        Assert.Equal("waiting", driver.Order);
+        Assert.True(_stops.Active);
     }
 
     [Fact]

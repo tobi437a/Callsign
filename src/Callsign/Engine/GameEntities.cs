@@ -134,14 +134,14 @@ namespace Callsign.Engine
         public void DriveAround()
         {
             if (!Driving(out Vehicle v)) return;
-            v.IsEngineRunning = true;
+            ReadyToDrive(v);
             Order(t => t.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles), onFoot: false);
         }
 
         public void DriveAway()
         {
             if (!Driving(out Vehicle v)) return;
-            v.IsEngineRunning = true;
+            ReadyToDrive(v);
             Ped.DrivingAggressiveness = 1f;
             Function.Call(Hash.SET_DRIVER_ABILITY, Ped, 1f);
             Order(t => t.StartVehicleMission(v, Game.Player.Character, VehicleMissionType.Flee, 45f,
@@ -151,13 +151,16 @@ namespace Callsign.Engine
         public void PullOver()
         {
             if (!Driving(out Vehicle v)) return;
-            // Roll on a little and steer to the kerb, then brake and stay there.
-            Vector3 kerb = v.Position + v.ForwardVector * 20f + v.RightVector * 3.5f;
+            // Roll on to a spot at the right-hand kerb a little ahead, slow down on the way, then brake there.
+            ReadyToDrive(v);
+            Vector3 kerb = KerbSpotAhead(v);
+            _pullOverSpot = kerb;
             Order(_ =>
             {
                 using (var sequence = new TaskSequence())
                 {
-                    sequence.AddTask.DriveTo(v, kerb, 6f, VehicleDrivingFlags.DrivingModeStopForVehicles, 4f);
+                    // Avoids traffic but doesn't wait at red lights: a car being pulled over rolls on to the kerb.
+                    sequence.AddTask.DriveTo(v, kerb, 7f, VehicleDrivingFlags.DrivingModeAvoidVehicles, 2f);
                     Function.Call(Hash.TASK_VEHICLE_TEMP_ACTION, 0, v, 27, 10_000);   // 27 = brake until stopped
                     sequence.Close();
                     Ped.Task.PerformSequence(sequence);
@@ -165,11 +168,147 @@ namespace Callsign.Engine
             }, onFoot: false);
         }
 
+        public bool AtPullOverSpot =>
+            _pullOverSpot != null && Ped.Exists() && Ped.IsInVehicle()
+            && Ped.CurrentVehicle.Position.DistanceTo2D(_pullOverSpot.Value) <= 4f;
+
+        /// <summary>
+        /// Where a car pulls over: the right-hand road edge some way ahead, moved in by about half a
+        /// car's width so it stands at the kerb rather than on it. Spots in or next to a junction
+        /// (crossings, lights, give-way lines) are skipped. Falls back to a plain offset.
+        /// </summary>
+        /// <summary>How the last pull-over spot was chosen (dev tools).</summary>
+        internal static string PullOverDebug = "";
+        internal static Vector3 LastPullOverSpot;
+
+        static Vector3 KerbSpotAhead(Vehicle v)
+        {
+            var debug = new System.Text.StringBuilder();
+            Vector3 spot = FindKerbSpot(v, debug);
+            PullOverDebug = debug.ToString();
+            LastPullOverSpot = spot;
+            return spot;
+        }
+
+        static Vector3 FindKerbSpot(Vehicle v, System.Text.StringBuilder debug)
+        {
+            // Which way the road runs here, the way the car is going (a car mid-turn points elsewhere).
+            if (!RoadAt(v.Position, v.Heading, out _, out float roadHeading)) roadHeading = v.Heading;
+            Vector3 along = Direction(roadHeading);
+
+            // Strict first (clear of junctions and of the queue for their lights); in a dense grid
+            // where nothing is, settle for anywhere outside the junction itself.
+            foreach (int avoid in new[] { JunctionFlags, Junction })
+            {
+                // Nearest first after a short roll-on; city blocks are short, so look a fair way ahead too.
+                foreach (float distance in new[] { 25f, 32f, 40f, 18f, 50f, 60f, 12f, 75f, 90f, 105f, 120f })
+                {
+                    Vector3 guess = v.Position + along * distance;
+                    if (!RoadAt(guess, roadHeading, out Vector3 node, out float heading)) { debug.Append(distance + ":nonode "); continue; }
+                    Vector3 dir = Direction(heading);
+                    var right = new Vector3(dir.Y, -dir.X, 0);
+                    // Still the same road: not around a bend, onto a crossing street or the far carriageway.
+                    // (Nodes are 10-20 m apart along a road, so only the sideways distance says anything.)
+                    float turn = Turn(heading, roadHeading), sideways = Math.Abs(Vector3.Dot(node - guess, right));
+                    if (turn > 30f || sideways > 8f) { debug.Append(distance + ":turn" + (int)turn + "/side" + (int)sideways + " "); continue; }
+                    if (Flags(node, avoid) || Flags(guess, avoid) || Flags(guess + dir * 8f, Junction) || Flags(guess - dir * 8f, Junction))
+                    { debug.Append(distance + ":junction "); continue; }
+                    if (TryKerb(guess, heading, out Vector3 kerb) || TryKerb(node, heading, out kerb)) { debug.Append(distance + ":OK"); return kerb; }
+                    debug.Append(distance + ":noedge" + LastEdge + " ");
+                }
+                debug.Append("| ");
+            }
+            debug.Append("FALLBACK");
+            return v.Position + along * 25f + new Vector3(along.Y, -along.X, 0) * 3.5f;
+        }
+
+        /// <summary>The road node nearest <paramref name="at"/>, with its heading turned to within 90° of <paramref name="heading"/>.</summary>
+        static bool RoadAt(Vector3 at, float heading, out Vector3 node, out float roadHeading)
+        {
+            var nodeOut = new OutputArgument();
+            var headingOut = new OutputArgument();
+            node = default;
+            roadHeading = heading;
+            if (!Function.Call<bool>(Hash.GET_CLOSEST_VEHICLE_NODE_WITH_HEADING, at.X, at.Y, at.Z, nodeOut, headingOut, 1, 3f, 0)) return false;
+            node = nodeOut.GetResult<Vector3>();
+            roadHeading = headingOut.GetResult<float>();
+            // Nodes are shared by both directions of a road, so their heading may point either way.
+            if (Turn(roadHeading, heading) > 90f) roadHeading = (roadHeading + 180f) % 360f;
+            return true;
+        }
+
+        static float Turn(float a, float b) => Math.Abs(((a - b) % 360 + 540) % 360 - 180);
+
+        /// <summary>Unit vector for a game heading (0 = north, counter-clockwise).</summary>
+        static Vector3 Direction(float heading)
+        {
+            double r = heading * Math.PI / 180;
+            return new Vector3(-(float)Math.Sin(r), (float)Math.Cos(r), 0);
+        }
+
+        /// <summary>The right-hand road edge level with <paramref name="at"/> for traffic heading <paramref name="heading"/>, moved in to where a car stands.</summary>
+        static int LastEdge;
+
+        /// <summary>
+        /// The right-hand road edge level with <paramref name="at"/> for traffic heading <paramref name="heading"/>,
+        /// moved in to where a car stands. The game's edge lookup follows the road link's own direction,
+        /// which may be either way, so both are asked and the rightmost edge is kept.
+        /// </summary>
+        static bool TryKerb(Vector3 at, float heading, out Vector3 kerb)
+        {
+            kerb = default;
+            LastEdge = -99;
+            Vector3 dir = Direction(heading);
+            var right = new Vector3(dir.Y, -dir.X, 0);
+            float best = float.MinValue;
+            Vector3 bestEdge = default;
+            foreach (float h in new[] { heading, (heading + 180f) % 360f })
+            {
+                var edge = new OutputArgument();
+                if (!Function.Call<bool>(Hash.GET_ROAD_BOUNDARY_USING_HEADING, at.X, at.Y, at.Z, h, edge)) continue;
+                Vector3 boundary = edge.GetResult<Vector3>();
+                float offset = Vector3.Dot(boundary - at, right);
+                LastEdge = (int)offset;
+                if (offset > best) { best = offset; bestEdge = boundary; }   // the rightmost edge is ours
+            }
+            // Within reason: the point may already be near (or just over) the kerb, but not far off the road.
+            if (best < -6f || best > 15f) return false;
+            kerb = at + right * (best - 1.4f);
+            kerb.Z = bestEdge.Z;
+            return true;
+        }
+
+        // Road node flags (game data): 128 = junction, 256 = approach to traffic lights, 512 = give way.
+        const int Junction = 128, JunctionFlags = 128 | 256 | 512;
+
+        /// <summary>The road node nearest <paramref name="at"/> has any of <paramref name="mask"/>.</summary>
+        static bool Flags(Vector3 at, int mask)
+        {
+            var density = new OutputArgument();
+            var flags = new OutputArgument();
+            if (!Function.Call<bool>(Hash.GET_VEHICLE_NODE_PROPERTIES, at.X, at.Y, at.Z, density, flags)) return false;
+            return (flags.GetResult<int>() & mask) != 0;
+        }
+
+        /// <summary>The spot the driver was last sent to pull over at.</summary>
+        Vector3? _pullOverSpot;
+
         public void WaitInVehicle()
         {
             if (!Driving(out Vehicle v)) return;
-            Order(t => t.StandStill(-1), onFoot: false);
-            v.IsEngineRunning = false;
+            _pullOverSpot = null;
+            // Brake "forever" (rather than stand still, which in a car lets the driving AI pick up
+            // again), engine off and kept off, handbrake on.
+            Order(_ => Function.Call(Hash.TASK_VEHICLE_TEMP_ACTION, Ped, v, 1, int.MaxValue), onFoot: false);
+            Function.Call(Hash.SET_VEHICLE_ENGINE_ON, v, false, true, true);
+            Function.Call(Hash.SET_VEHICLE_HANDBRAKE, v, true);
+        }
+
+        /// <summary>Undoes <see cref="WaitInVehicle"/> before the ped drives again.</summary>
+        static void ReadyToDrive(Vehicle v)
+        {
+            Function.Call(Hash.SET_VEHICLE_HANDBRAKE, v, false);
+            Function.Call(Hash.SET_VEHICLE_ENGINE_ON, v, true, true, false);
         }
 
         public void ShootFromVehicle()
@@ -305,12 +444,13 @@ namespace Callsign.Engine
                 if (InPlayerVehicle) Ped.Task.LeaveVehicle(LeaveVehicleFlags.None);
                 else if (Driving(out Vehicle v))
                 {
-                    v.IsEngineRunning = true;
+                    ReadyToDrive(v);
                     Ped.Task.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles);
                 }
                 else if (OwnCarNearby(out Vehicle car))
                 {
                     // A driver who was ordered out goes back to their car and drives on.
+                    ReadyToDrive(car);
                     using (var sequence = new TaskSequence())
                     {
                         sequence.AddTask.EnterVehicle(car, VehicleSeat.Driver, 20_000, 1f, EnterVehicleFlags.None);

@@ -57,8 +57,11 @@ namespace Callsign.Core.Ports
         /// <summary>Drives away from the player, fast and recklessly.</summary>
         void DriveAway();
 
-        /// <summary>Pulls over to the side of the road and stops there.</summary>
+        /// <summary>Pulls over to the side of the road a little ahead and stops there.</summary>
         void PullOver();
+
+        /// <summary>After <see cref="PullOver"/>: the vehicle has reached the spot it was pulling over at.</summary>
+        bool AtPullOverSpot { get; }
 
         /// <summary>Stays stopped at the wheel with the engine off (pulled over, waiting for the officer).</summary>
         void WaitInVehicle();

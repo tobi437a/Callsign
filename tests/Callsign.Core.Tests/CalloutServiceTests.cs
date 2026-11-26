@@ -72,6 +72,7 @@ sealed class FakePed(Position at) : IPed
     public void DriveAround() { if (Seat == 0 && InVehicle) Order = "drive"; }
     public void DriveAway() { if (Seat == 0 && InVehicle) Order = "driveaway"; }
     public void PullOver() { if (Seat == 0 && InVehicle) Order = "pullover"; }
+    public bool AtPullOverSpot { get; set; }
     public void WaitInVehicle() { if (Seat == 0 && InVehicle) Order = "waiting"; }
     public void ShootFromVehicle() { if (InVehicle) Order = "driveby"; }
 
@@ -331,6 +332,10 @@ public class CalloutServiceTests
 
         _duty.End("traffic stop");
         Tick();
+        Assert.Equal(CalloutService.Phase.Waiting, _service.Current);   // a breather first, as after a call
+        Advance(_settings.NextOfferMinMs - 1);
+        Assert.Equal(CalloutService.Phase.Waiting, _service.Current);
+        Advance(_settings.NextOfferMaxMs);
         Assert.Equal(CalloutService.Phase.Offered, _service.Current);
 
         // An offer that came in before the officer got busy can't be taken until they're free.
@@ -613,6 +618,9 @@ public class CalloutServiceTests
         car.Speed = 0;
         Tick();
         Assert.Equal("pullover", driver.Order);   // a moment's pause isn't a stop yet
+        Advance(_settings.PulledOverMs);
+        Assert.Equal("pullover", driver.Order);   // nor is waiting in traffic short of the kerb
+        driver.AtPullOverSpot = true;
         Advance(_settings.PulledOverMs);
         Assert.Equal("waiting", driver.Order);    // engine off, waits in the car for the officer
         Assert.True(driver.InVehicle);
