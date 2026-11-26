@@ -188,6 +188,12 @@ namespace Callsign.Dev
                     var keys = Enumerable.Repeat(new[] { "key", "Down" }, steps).Append(new[] { "key", "Return" });
                     _queue.InsertRange(0, keys.Select(k => ("-", k)));
                     return menu.Items[target].Label;
+                case "street":   // where the street lookup (call fallback location, vehicle spawns) lands near the player, and its node flags
+                    if (!new GameWorld().TryFindStreetNear(player.Position.ToPosition(), out Callsign.Core.World.Position st, out _)) return "none";
+                    var stDens = new OutputArgument(); var stFlags = new OutputArgument();
+                    Function.Call<bool>(Hash.GET_VEHICLE_NODE_PROPERTIES, st.X, st.Y, st.Z, stDens, stFlags);
+                    return Fmt(st.ToVector()) + " " + player.Position.DistanceTo(st.ToVector()).ToString("0", CultureInfo.InvariantCulture)
+                        + "m flags=" + stFlags.GetResult<int>();
                 case "nodes":   // road node flags straight ahead of the player's vehicle, every 10 m
                     Entity from = (Entity?)player.CurrentVehicle ?? player;
                     var sb = new System.Text.StringBuilder();

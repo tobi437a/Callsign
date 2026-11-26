@@ -797,6 +797,11 @@ public class CalloutServiceTests
         Assert.Contains(_notifier.Messages, m => m.Contains("fleeing"));
         Tick(interact: true);   // no menu on a runner
         Assert.Equal(CalloutService.Phase.Active, _service.Current);
+
+        Advance(1_000);   // still right next to the player: a head start, not caught on the spot
+        Assert.Equal("flee", suspect.Order);
+        Advance(_settings.CatchGraceMs);
+        Assert.Equal("handsup", suspect.Order);
     }
 
     [Fact]

@@ -22,6 +22,8 @@ namespace Callsign.Core.Callouts
         public float InteractDistance { get; set; } = 3;
         /// <summary>A fleeing suspect gives up when the player gets this close on foot.</summary>
         public float CatchDistance { get; set; } = 2.5f;
+        /// <summary>A suspect who starts running right next to the player can't be caught for this long (unless they got clear first).</summary>
+        public long CatchGraceMs { get; set; } = 4_000;
         /// <summary>A suspect this far from the player has got away.</summary>
         public float EscapeDistance { get; set; } = 250;
 

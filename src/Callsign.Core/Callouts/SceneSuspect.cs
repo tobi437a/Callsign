@@ -35,6 +35,8 @@ namespace Callsign.Core.Callouts
         readonly CalloutSceneServices _s;
         IBlip? _blip;
         Custody? _custody;
+        long _ranAt;
+        bool _brokeAway;
 
         public SceneSuspect(IPed ped, SuspectProfile profile, SuspectBehaviour behaviour, int seat,
             EntityScope scope, CalloutSceneServices services)
@@ -172,7 +174,10 @@ namespace Callsign.Core.Callouts
                         Finish(SuspectResult.Escaped, "~o~A suspect got away.~s~");
                         return false;
                     }
-                    bool caught = Current == State.Running && !Ped.InVehicle
+                    // A runner who bolts from right next to the player gets a head start before they count as caught.
+                    if (distance > _s.Settings.CatchDistance * 2) _brokeAway = true;
+                    bool headStartOver = _brokeAway || _s.Clock.NowMs - _ranAt >= _s.Settings.CatchGraceMs;
+                    bool caught = Current == State.Running && !Ped.InVehicle && headStartOver
                         && distance <= _s.Settings.CatchDistance && world.PlayerOnFoot;
                     if (caught || Ped.IsSubdued) Surrender(announce: true);
                     return false;
@@ -236,6 +241,8 @@ namespace Callsign.Core.Callouts
         void Run()
         {
             Current = State.Running;
+            _ranAt = _s.Clock.NowMs;
+            _brokeAway = _s.World.PlayerPosition.DistanceTo(Ped.Position) > _s.Settings.CatchDistance * 2;
             ShowBlip("Suspect", MarkerColor.Red);
             Ped.FleeFromPlayer();
             _s.Notifier.Notify("~r~Suspect fleeing on foot!~s~");

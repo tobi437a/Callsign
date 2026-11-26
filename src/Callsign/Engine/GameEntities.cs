@@ -41,11 +41,33 @@ namespace Callsign.Engine
             }
         }
 
+        const int HighwayNodeFlag = 64;
+        const int StreetNodesToTry = 25;
+
+        /// <summary>The nearest road node that isn't a highway (no foot calls on a freeway, no traffic stops at 120 km/h).</summary>
         public bool TryFindStreetNear(Position near, out Position position, out float heading)
         {
-            Vector3 found = World.GetNextPositionOnStreetWithHeading(near.ToVector(), out heading, false);
-            position = found.ToPosition();
-            return found != Vector3.Zero;
+            Vector3 at = near.ToVector();
+            for (int n = 1; n <= StreetNodesToTry; n++)
+            {
+                var nodeOut = new OutputArgument();
+                var headingOut = new OutputArgument();
+                var lanesOut = new OutputArgument();
+                if (!Function.Call<bool>(Hash.GET_NTH_CLOSEST_VEHICLE_NODE_WITH_HEADING, at.X, at.Y, at.Z, n, nodeOut, headingOut, lanesOut, 0, 3f, 0f))
+                    break;
+                Vector3 node = nodeOut.GetResult<Vector3>();
+                var density = new OutputArgument();
+                var flags = new OutputArgument();
+                if (Function.Call<bool>(Hash.GET_VEHICLE_NODE_PROPERTIES, node.X, node.Y, node.Z, density, flags)
+                    && (flags.GetResult<int>() & HighwayNodeFlag) != 0)
+                    continue;
+                position = node.ToPosition();
+                heading = headingOut.GetResult<float>();
+                return true;
+            }
+            position = default;
+            heading = 0;
+            return false;
         }
 
         public bool TryFindPedSpotNear(Position near, out Position position)
