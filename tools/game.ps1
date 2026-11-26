@@ -3,7 +3,7 @@
 #   game.ps1 cmd "duty on" "state"  run dev-bridge commands in order, print their results
 #   game.ps1 run <scenario>         run tools\scenarios\<scenario>.txt (one command per line, # comments);
 #                                   exits 1 if any command failed (e.g. an "expect" check)
-#   game.ps1 shot [file.png]        screenshot of the game (brings it to the front for a moment)
+#   game.ps1 shot [file.png]        screenshot of the game (brings it to the front for a moment, then gives focus back)
 #   game.ps1 log [lines]            tail Callsign.log
 #   game.ps1 focus                  bring the game to the front
 #   game.ps1 key Escape             focus the game and tap a key (System.Windows.Forms.Keys name)
@@ -52,6 +52,7 @@ public static class GameWin {
     }
 
     public static bool IsFront(IntPtr h) { return GetForegroundWindow() == h; }
+    public static IntPtr Front() { return GetForegroundWindow(); }
 
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 
@@ -163,8 +164,11 @@ switch ($Action) {
         $h = Get-GameWindow
         $path = if ($Rest) { $Rest[0] } else { Join-Path $env:TEMP "callsign-shot.png" }
         # Always in front: a DirectX game window can't be captured from behind (PrintWindow gives a stale frame).
+        # Then hand the focus back to whatever the owner was using, so they aren't left watching the game.
+        $prev = [GameWin]::Front()
         Focus-Game $h
-        [GameWin]::Shot($h, $path)
+        try { [GameWin]::Shot($h, $path) }
+        finally { if ($prev -ne [IntPtr]::Zero -and $prev -ne $h) { [void][GameWin]::Focus($prev) } }
         $path
     }
 
