@@ -16,6 +16,7 @@ using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
 using Callsign.Core.Interaction;
+using Callsign.Core.PedStops;
 using Callsign.Core.Suspects;
 using Callsign.Core.TrafficStops;
 using Callsign.Core.Ports;
@@ -71,18 +72,20 @@ namespace Callsign
             var callouts = new CalloutService(new IncidentGenerator(parts, random, s => settings.Current.Callouts.IsEnabled(s.Id), director),
                 duty, bus, clock, random, sceneServices, director);
             var trafficStops = new TrafficStopService(duty, bus, new GameTraffic(), sceneServices);
+            var pedStops = new PedStopService(duty, bus, new GamePedestrians(), sceneServices);
             // New settings: add items to a page, or a page here.
             var settingsMenu = new SettingsMenu(new ISettingsPage[] { new CalloutsSettingsPage(parts, settings), new VehicleSettingsPage(new GamePlayerVehicle(), notifier) });
 
             // --- modules, in tick order (dev bridge first so its keys count this tick; settings before
             //     the gameplay modules so an open settings menu keeps its keys; plugins last) ---
             if (System.IO.Directory.Exists(paths.Dev))
-                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, director, trafficStops, settingsMenu, _scopes, _input, _log));
+                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, director, trafficStops, pedStops, settingsMenu, _scopes, _input, _log));
             _modules.Add(new SettingsModule(settingsMenu, menuView, _input,
-                () => (callouts.Scene ?? trafficStops.Scene)?.FocusInteraction?.MenuOpen == true));
+                () => (callouts.Scene ?? trafficStops.Scene ?? pedStops.Scene)?.FocusInteraction?.MenuOpen == true));
             _modules.Add(new DutyModule(duty, bus, _input));
             _modules.Add(new CalloutsModule(callouts, _input));
             _modules.Add(new TrafficStopsModule(trafficStops, _input));
+            _modules.Add(new PedStopsModule(pedStops, _input));
             _modules.Add(new PluginsModule(paths.Plugins, duty, parts, callouts, bus, _log));
 
             foreach (IModule m in _modules)

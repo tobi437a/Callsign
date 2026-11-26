@@ -89,6 +89,21 @@ namespace Callsign.Core.Callouts
             }
         }
 
+        /// <summary>
+        /// The player stopped them on foot (a pedestrian stop): a calm one stands and talks, anyone
+        /// else reacts as rolled.
+        /// </summary>
+        public void StoppedOnFoot()
+        {
+            if (Behaviour != SuspectBehaviour.Comply)
+            {
+                Engage();
+                return;
+            }
+            Current = State.Calm;
+            Interaction.StoppedByOfficer();
+        }
+
         /// <summary>The suspects' vehicle came to a stop after a pursuit: everyone gets out. Calm ones give up.</summary>
         public void BailOut()
         {

@@ -10,6 +10,7 @@ using Callsign.Core.Callouts;
 using Callsign.Core.Director;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
+using Callsign.Core.PedStops;
 using Callsign.Core.Ports;
 using Callsign.Core.Settings;
 using Callsign.Core.TrafficStops;
@@ -30,13 +31,14 @@ namespace Callsign.Dev
     {
         public const string Help =
             "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId [complicationId|none]] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
-            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | damage | god on|off | hour <0-23> | mark <text>";
+            + "| traffic [model] | stop | ped [model] | pedstop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | damage | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
         readonly CalloutService _callouts;
         readonly PacingDirector _director;
         readonly TrafficStopService _stops;
+        readonly PedStopService _pedStops;
         readonly SettingsMenu _settings;
         readonly EntityScopes _scopes;
         readonly KeyInput _input;
@@ -48,7 +50,7 @@ namespace Callsign.Dev
         readonly List<(Vector3 At, System.Drawing.Color Color)> _markers = new List<(Vector3, System.Drawing.Color)>();
         int _nextPoll;
 
-        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, PacingDirector director, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
+        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, PacingDirector director, TrafficStopService stops, PedStopService pedStops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
         {
             _settings = settings;
             _dir = dir;
@@ -56,6 +58,7 @@ namespace Callsign.Dev
             _callouts = callouts;
             _director = director;
             _stops = stops;
+            _pedStops = pedStops;
             _scopes = scopes;
             _input = input;
             _log = log;
@@ -106,7 +109,7 @@ namespace Callsign.Dev
 
         Vector3 SceneFocus()
         {
-            CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? throw new InvalidOperationException("no scene");
+            CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? _pedStops.Scene ?? throw new InvalidOperationException("no scene");
             return new Vector3(scene.Focus.X, scene.Focus.Y, scene.Focus.Z);
         }
 
@@ -156,7 +159,7 @@ namespace Callsign.Dev
                     return _callouts.Describe();
                 case "accept": return Check(_callouts.Accept(), "nothing offered");
                 case "decline": return Check(_callouts.Decline(), "nothing offered");
-                case "cancel": return Check(_callouts.Cancel() || _stops.Cancel(), "no call or stop running");
+                case "cancel": return Check(_callouts.Cancel() || _stops.Cancel() || _pedStops.Cancel(), "no call or stop running");
                 case "onfoot":
                     if (player.IsInVehicle()) player.Task.WarpOutOfVehicle(player.CurrentVehicle);
                     return "";
@@ -178,7 +181,7 @@ namespace Callsign.Dev
                     traffic.MarkAsNoLongerNeeded();
                     return traffic.LocalizedName + " " + traffic.Mods.LicensePlate;
                 case "pick":   // choose a menu item by id (settings menu first), by pressing the keys a player would (one per tick)
-                    var interaction = (_callouts.Scene ?? _stops.Scene)?.FocusInteraction;
+                    var interaction = (_callouts.Scene ?? _stops.Scene ?? _pedStops.Scene)?.FocusInteraction;
                     var menu = _settings.IsOpen ? _settings.Menu
                         : interaction != null && interaction.MenuOpen ? interaction.Menu
                         : throw new InvalidOperationException("no menu open");
@@ -260,6 +263,16 @@ namespace Callsign.Dev
                     World.RenderingCamera = _cam;
                     return Fmt(f);
                 case "stop": return Check(_stops.TryStart(), "no traffic stop started");
+                case "pedstop": return Check(_pedStops.TryStart(), "no pedestrian stop started");
+                case "ped":   // an ambient pedestrian standing just in front of the player, facing them
+                    var pedModel = new Model(a.Length > 1 ? arg(1) : "a_m_y_business_01");
+                    if (!pedModel.IsPed) throw new ArgumentException("not a ped: " + arg(1));
+                    if (!pedModel.Request(5000)) throw new InvalidOperationException("model didn't load");
+                    Ped walker = World.CreatePed(pedModel, player.Position + player.ForwardVector * 2.5f, player.Heading + 180f);
+                    pedModel.MarkAsNoLongerNeeded();
+                    walker.Task.StandStill(-1);
+                    walker.MarkAsNoLongerNeeded();   // ambient, like a real passer-by
+                    return walker.Gender.ToString();
 
                 case "key":
                     var key = (Keys)Enum.Parse(typeof(Keys), arg(1), ignoreCase: true);
@@ -274,7 +287,7 @@ namespace Callsign.Dev
                     Vector3 to;
                     if (arg(1) == "scene")
                     {
-                        CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? throw new InvalidOperationException("no scene");
+                        CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? _pedStops.Scene ?? throw new InvalidOperationException("no scene");
                         float back = a.Length > 2 ? Num(arg(2)) : 15f;
                         Vector3 focus = new Vector3(scene.Focus.X, scene.Focus.Y, scene.Focus.Z);
                         Vector3 away = player.Position - focus;
@@ -342,6 +355,7 @@ namespace Callsign.Dev
                 + " busy=" + (_duty.Activity ?? "no")
                 + " callout=" + _callouts.Describe()
                 + " stop=" + _stops.Describe()
+                + " pedstop=" + _pedStops.Describe()
                 + " director=[" + _director.Describe() + "]"
                 + " settings=" + (_settings.IsOpen ? "[" + _settings.Menu.Title + ": " + string.Join(",", _settings.Menu.Items.Select(i => i.Id + (i.Value != null ? "=" + i.Value.Replace("~g~", "").Replace("~r~", "") : ""))) + "]" : "closed");
         }

@@ -4,6 +4,7 @@ using System.Linq;
 using Callsign.Core.Callouts;
 using Callsign.Core.Events;
 using Callsign.Core.Ports;
+using Callsign.Core.PedStops;
 using Callsign.Core.TrafficStops;
 
 namespace Callsign.Core.Director
@@ -72,6 +73,8 @@ namespace Callsign.Core.Director
             bus.Subscribe<CalloutEnded>(e => Add(Load(e)));
             bus.Subscribe<TrafficStopStarted>(_ => Active());
             bus.Subscribe<TrafficStopEnded>(e => Add(Load(e.Result)));
+            bus.Subscribe<PedStopStarted>(_ => Active());
+            bus.Subscribe<PedStopEnded>(e => Add(Load(e.Result)));
         }
 
         public CallMemory Situations { get; }
@@ -174,6 +177,18 @@ namespace Callsign.Core.Director
                 case TrafficStopResult.Arrested: return 0.35;
                 case TrafficStopResult.Cancelled: return 0;
                 default: return 0.1;
+            }
+        }
+
+        static double Load(PedStopResult result)
+        {
+            switch (result)
+            {
+                case PedStopResult.Escaped: return 0.5;
+                case PedStopResult.SuspectDied: return 0.7;
+                case PedStopResult.Arrested: return 0.3;
+                case PedStopResult.Cancelled: return 0;
+                default: return 0.05;
             }
         }
 
