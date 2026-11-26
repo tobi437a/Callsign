@@ -91,7 +91,7 @@ with the built-in calls. Built-in content uses the same API.
 - [x] Arrests: cuffing, transport, booking
 - [x] Stopping and questioning suspects; vehicle calls and pursuits
 - [x] Traffic stops
-- [ ] Pedestrian stops
+- [x] Pedestrian stops
 - [x] Pacing director: calm after chaos, no repeats back-to-back
 - [ ] Pick a mode on every start: **Career** or **Free patrol** (everything unlocked)
 - [ ] Career: rookie in Los Santos with a field training officer → Officer → Senior Officer → Sergeant → specialisations
