@@ -16,6 +16,7 @@ using Callsign.Core.Entities;
 using Callsign.Core.Events;
 using Callsign.Core.Interaction;
 using Callsign.Core.Suspects;
+using Callsign.Core.TrafficStops;
 using Callsign.Core.Ports;
 using Callsign.Dev;
 using Callsign.Engine;
@@ -63,12 +64,14 @@ namespace Callsign
                 world, notifier, clock, random, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
                 interaction, custody);
             var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
+            var trafficStops = new TrafficStopService(duty, bus, new GameTraffic(), sceneServices);
 
             // --- modules, in tick order (dev bridge first so its keys count this tick; plugins last) ---
             if (System.IO.Directory.Exists(paths.Dev))
-                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, _scopes, _input, _log));
+                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, trafficStops, _scopes, _input, _log));
             _modules.Add(new DutyModule(duty, bus, _input));
             _modules.Add(new CalloutsModule(callouts, _input));
+            _modules.Add(new TrafficStopsModule(trafficStops, _input));
             _modules.Add(new PluginsModule(paths.Plugins, duty, parts, callouts, bus, _log));
 
             foreach (IModule m in _modules)

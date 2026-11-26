@@ -6,10 +6,13 @@ using Menu = Callsign.Core.Ui.Menu;
 
 namespace Callsign.Engine
 {
-    /// <summary>Draws a <see cref="Menu"/> as a simple list on the left of the screen (1280x720 layout units).</summary>
+    /// <summary>
+    /// Draws a <see cref="Menu"/> as a simple list on the right of the screen (1280x720 layout units),
+    /// clear of the help box (top left) and the notification feed (bottom left).
+    /// </summary>
     internal sealed class GameMenuView : IMenuView
     {
-        const float X = 30, Y = 170, Width = 400, TitleHeight = 36, RowHeight = 30, Padding = 10;
+        const float Width = 400, X = 1280 - 30 - Width, Y = 120, TitleHeight = 36, RowHeight = 27, Padding = 10;
 
         static readonly Color TitleBack = Color.FromArgb(230, 20, 60, 140);
         static readonly Color RowBack = Color.FromArgb(190, 0, 0, 0);
@@ -44,7 +47,7 @@ namespace Callsign.Engine
                 Color color = !item.Enabled ? DisabledText : selected ? SelectedText : Text;
                 // Colour codes in labels would fight the selected row's dark text, so drop them there.
                 string label = selected ? StripColours(item.Label) : item.Label;
-                new TextElement(label, new PointF(X + Padding, y + 4), 0.35f, color, GTA.UI.Font.ChaletLondon).Draw();
+                new TextElement(label, new PointF(X + Padding, y + 3), 0.35f, color, GTA.UI.Font.ChaletLondon).Draw();
                 y += RowHeight;
             }
 

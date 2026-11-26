@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GTA;
 using GTA.Math;
 using GTA.Native;
@@ -132,13 +133,15 @@ namespace Callsign.Engine
 
         public void DriveAround()
         {
-            if (Driving(out Vehicle v))
-                Order(t => t.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles), onFoot: false);
+            if (!Driving(out Vehicle v)) return;
+            v.IsEngineRunning = true;
+            Order(t => t.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles), onFoot: false);
         }
 
         public void DriveAway()
         {
             if (!Driving(out Vehicle v)) return;
+            v.IsEngineRunning = true;
             Ped.DrivingAggressiveness = 1f;
             Function.Call(Hash.SET_DRIVER_ABILITY, Ped, 1f);
             Order(t => t.StartVehicleMission(v, Game.Player.Character, VehicleMissionType.Flee, 45f,
@@ -162,6 +165,13 @@ namespace Callsign.Engine
             }, onFoot: false);
         }
 
+        public void WaitInVehicle()
+        {
+            if (!Driving(out Vehicle v)) return;
+            Order(t => t.StandStill(-1), onFoot: false);
+            v.IsEngineRunning = false;
+        }
+
         public void ShootFromVehicle()
         {
             if (!Ped.Exists() || !Ped.IsInVehicle()) return;
@@ -169,6 +179,14 @@ namespace Callsign.Engine
             Ped.SetCombatAttribute(CombatAttributes.CanDoDrivebys, true);
             Ped.Weapons.Select(Ped.Weapons.BestWeapon);
             Order(t => t.Combat(Game.Player.Character), onFoot: false);
+        }
+
+        /// <summary>The vehicle this ped last sat in, if it's close, drivable, not the player's and nobody's at the wheel.</summary>
+        bool OwnCarNearby(out Vehicle vehicle)
+        {
+            vehicle = Ped.LastVehicle;
+            return vehicle != null && vehicle.Exists() && vehicle.IsDriveable && vehicle != PlayerVehicle()
+                && vehicle.Driver == null && vehicle.Position.DistanceTo(Ped.Position) < 25f;
         }
 
         bool Driving(out Vehicle vehicle)
@@ -285,7 +303,22 @@ namespace Callsign.Engine
                 Ped.Task.ClearAll();
                 Ped.Task.ClearSecondary();   // uncuffed
                 if (InPlayerVehicle) Ped.Task.LeaveVehicle(LeaveVehicleFlags.None);
-                else if (Driving(out Vehicle v)) Ped.Task.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles);
+                else if (Driving(out Vehicle v))
+                {
+                    v.IsEngineRunning = true;
+                    Ped.Task.CruiseWithVehicle(v, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles);
+                }
+                else if (OwnCarNearby(out Vehicle car))
+                {
+                    // A driver who was ordered out goes back to their car and drives on.
+                    using (var sequence = new TaskSequence())
+                    {
+                        sequence.AddTask.EnterVehicle(car, VehicleSeat.Driver, 20_000, 1f, EnterVehicleFlags.None);
+                        sequence.AddTask.CruiseWithVehicle(car, 14f, VehicleDrivingFlags.DrivingModeStopForVehicles);
+                        sequence.Close();
+                        Ped.Task.PerformSequence(sequence);
+                    }
+                }
             }
             ReleaseEntity(Ped, mode);
         }
@@ -306,6 +339,8 @@ namespace Callsign.Engine
         public bool Exists => Vehicle.Exists();
         public Position Position => Vehicle.Position.ToPosition();
         public float Speed => Vehicle.Exists() ? Vehicle.Speed : 0f;
+        public string Plate => Vehicle.Exists() ? Vehicle.Mods.LicensePlate.Trim() : "";
+        public string Model => Vehicle.Exists() ? Vehicle.LocalizedName : "vehicle";
         public bool IsWrecked => !Vehicle.Exists() || Vehicle.IsDead || !Vehicle.IsDriveable;
 
         // Wheel ids 0..5: front, middle (6-wheelers) and rear pairs.
@@ -383,6 +418,49 @@ namespace Callsign.Engine
             m.MarkAsNoLongerNeeded();
             if (created == null) return false;
             vehicle = scope.Track(new GameVehicle(created));
+            return true;
+        }
+    }
+
+    internal sealed class GameTraffic : ITraffic
+    {
+        public bool TryTakeVehicleAhead(EntityScope scope, float maxDistance, out IVehicle? vehicle, out IReadOnlyList<IPed> occupants)
+        {
+            vehicle = null;
+            occupants = Array.Empty<IPed>();
+            Ped player = Game.Player.Character;
+            Vehicle? own = player.CurrentVehicle;
+            if (own == null || !own.Exists()) return false;
+
+            Vehicle? best = null;
+            float bestScore = float.MaxValue;
+            foreach (Vehicle v in World.GetNearbyVehicles(own.Position, maxDistance))
+            {
+                if (v == own || !v.Exists() || v.IsDead || v.IsPersistent) continue;   // persistent = a mission's or ours
+                Ped? driver = v.Driver;
+                if (driver == null || !driver.Exists() || driver.IsPlayer || driver.IsDead) continue;
+                Vector3 to = v.Position - own.Position;
+                float distance = to.Length();
+                if (distance < 1f) continue;
+                float ahead = Vector3.Dot(to / distance, own.ForwardVector);                  // 1 = dead ahead
+                float sameWay = Vector3.Dot(v.ForwardVector, own.ForwardVector);
+                if (ahead < 0.85f || sameWay < 0.3f) continue;
+                float score = distance / ahead;
+                if (score < bestScore) { best = v; bestScore = score; }
+            }
+            if (best == null) return false;
+
+            best.IsPersistent = true;
+            vehicle = scope.Track(new GameVehicle(best));
+            var peds = new List<IPed>();
+            foreach (VehicleSeat seat in new[] { VehicleSeat.Driver, VehicleSeat.Passenger, VehicleSeat.LeftRear, VehicleSeat.RightRear })
+            {
+                Ped? ped = best.GetPedOnSeat(seat);
+                if (ped == null || !ped.Exists() || ped.IsDead) continue;
+                ped.IsPersistent = true;
+                peds.Add(scope.Track(new GamePed(ped)));
+            }
+            occupants = peds;
             return true;
         }
     }

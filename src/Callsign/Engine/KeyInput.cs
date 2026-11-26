@@ -12,7 +12,9 @@ namespace Callsign.Engine
     {
         readonly HashSet<Keys> _pressed = new HashSet<Keys>();
         readonly Dictionary<Keys, int> _downSince = new Dictionary<Keys, int>();
-        readonly HashSet<Keys> _holdReported = new HashSet<Keys>();
+        /// <summary>Keys whose hold has fired, and the frame it fired in (every module asking that frame sees it).</summary>
+        readonly Dictionary<Keys, int> _holdReported = new Dictionary<Keys, int>();
+        int _frame;
         readonly Dictionary<Keys, int> _injectedUntil = new Dictionary<Keys, int>();
 
         public void Press(Keys key)
@@ -33,12 +35,15 @@ namespace Callsign.Engine
 
         public bool WasPressed(Keys key) => _pressed.Contains(key);
 
-        /// <summary>True on the one tick where <paramref name="key"/> has been held for <paramref name="ms"/>.</summary>
+        /// <summary>
+        /// True on the one tick where <paramref name="key"/> has been held for <paramref name="ms"/>
+        /// (for every caller that tick, so modules don't steal it from each other).
+        /// </summary>
         public bool WasHeld(Keys key, int ms)
         {
-            if (!_downSince.TryGetValue(key, out int since) || _holdReported.Contains(key)) return false;
-            if (Environment.TickCount - since < ms) return false;
-            _holdReported.Add(key);
+            if (_holdReported.TryGetValue(key, out int frame)) return frame == _frame;
+            if (!_downSince.TryGetValue(key, out int since) || Environment.TickCount - since < ms) return false;
+            _holdReported[key] = _frame;
             return true;
         }
 
@@ -46,6 +51,7 @@ namespace Callsign.Engine
         public void EndFrame()
         {
             _pressed.Clear();
+            _frame++;
             // Polling instead of KeyUp events: a key released while the game was unfocused still gets let go.
             var released = new List<Keys>();
             foreach (Keys key in _downSince.Keys)

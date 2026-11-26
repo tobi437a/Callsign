@@ -102,7 +102,8 @@ namespace Callsign.Core.Suspects
             return forced;
         }
 
-        Identity NewIdentity(bool male) =>
+        /// <summary>A random person's name and age (e.g. a vehicle's registered owner).</summary>
+        public Identity NewIdentity(bool male) =>
             new Identity(Pick(male ? _content.MaleNames : _content.FemaleNames) ?? "John",
                 Pick(_content.LastNames) ?? "Doe", _random.Next(18, 66));
 

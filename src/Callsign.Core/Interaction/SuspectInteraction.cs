@@ -21,6 +21,7 @@ namespace Callsign.Core.Interaction
         public long RecordsCheckMs { get; set; } = 5_000;
         public long BreathTestMs { get; set; } = 4_000;
         public long DrugSwabMs { get; set; } = 6_000;
+        public long PlateCheckMs { get; set; } = 4_000;
 
         /// <summary>A nervous suspect with something to hide runs when stopped.</summary>
         public double FleeWhenStopped { get; set; } = 0.2;
@@ -30,6 +31,8 @@ namespace Callsign.Core.Interaction
         public double FleeOnArrest { get; set; } = 0.25;
         /// <summary>A nervous suspect with a hidden weapon pulls it when searched.</summary>
         public double AttackOnSearch { get; set; } = 0.35;
+        /// <summary>A nervous driver of a stolen vehicle floors it when they hear the plate go over the radio.</summary>
+        public double FleeOnPlateCheck { get; set; } = 0.4;
     }
 
     /// <summary>What the interaction needs from the game.</summary>
@@ -54,6 +57,8 @@ namespace Callsign.Core.Interaction
         Arrest,
         /// <summary>The player let them go.</summary>
         Release,
+        /// <summary>The player wrote them a ticket and let them go.</summary>
+        Cite,
         /// <summary>The suspect ran.</summary>
         Fled,
         /// <summary>The suspect attacked the player.</summary>
@@ -73,9 +78,10 @@ namespace Callsign.Core.Interaction
 
         // Menu item ids.
         public const string AskId = "id", AskPurpose = "purpose", AskDrinking = "drinking", RunName = "records",
-            BreathTest = "breath", DrugSwab = "drugs", StepOut = "stepout", Search = "search", Arrest = "arrest", LetGo = "release";
+            BreathTest = "breath", DrugSwab = "drugs", StepOut = "stepout", Search = "search", Arrest = "arrest", LetGo = "release",
+            RunPlate = "plate", Cite = "cite";
 
-        enum Check { None, Records, Breath, Drugs }
+        enum Check { None, Records, Breath, Drugs, Plate }
 
         readonly IPed _suspect;
         readonly SuspectProfile _profile;
@@ -84,7 +90,7 @@ namespace Callsign.Core.Interaction
         bool _menuOpen;
         bool _ranOnce;
         Identity? _knownName;
-        string? _recordsResult, _breathResult, _drugResult;
+        string? _recordsResult, _breathResult, _drugResult, _plateResult;
         Check _pending;
         long _pendingDoneAt;
         DialogueContext _context = DialogueContext.OnFoot;
@@ -101,7 +107,13 @@ namespace Callsign.Core.Interaction
 
         public bool MenuOpen => _menuOpen;
 
+        /// <summary>The menu, for dev tools.</summary>
+        internal Menu Menu => _menu;
+
         public SuspectProfile Profile => _profile;
+
+        /// <summary>The vehicle they were driving, if any: adds a plate check and a citation to the menu.</summary>
+        public VehicleRecord? Vehicle { get; set; }
 
         /// <summary>The suspect gave up (e.g. caught after running): they stay put; no new escape attempts.</summary>
         public void Surrendered()
@@ -198,11 +210,16 @@ namespace Callsign.Core.Interaction
             yield return new MenuItem(DrugSwab,
                 _drugResult ?? (_pending == Check.Drugs ? "Drug swab: waiting for result..." : kitNear ? "Drug swab (kit from your vehicle)" : "Drug swab (your vehicle must be nearby)"),
                 _drugResult == null && !busy && kitNear);
+            if (Vehicle != null)
+                yield return new MenuItem(RunPlate,
+                    _plateResult ?? (_pending == Check.Plate ? "Plate: waiting for dispatch..." : "Run the plate (" + Vehicle.Plate + ")"),
+                    _plateResult == null && !busy);
             bool seated = _suspect.InVehicle;
             if (seated) yield return new MenuItem(StepOut, "Order them out of the vehicle");
             yield return new MenuItem(Search, seated ? "Pat down (order them out first)" : "Pat down", !seated);
             yield return new MenuItem(Arrest, "~r~Arrest~s~");
-            yield return new MenuItem(LetGo, "~g~Let them go~s~");
+            if (Vehicle != null) yield return new MenuItem(Cite, "~y~Issue a citation~s~");
+            yield return new MenuItem(LetGo, Vehicle != null ? "~g~Let them go with a warning~s~" : "~g~Let them go~s~");
         }
 
         bool DrugKitNear() =>
@@ -274,6 +291,17 @@ namespace Callsign.Core.Interaction
                     if (_profile.Has(SuspectTraits.Warrant) && !_ranOnce && Chance(_s.Settings.FleeOnArrest)) return Flee();
                     return InteractionOutcome.Arrest;
 
+                case RunPlate:
+                    _s.Notifier.Notify("~b~You:~s~ Dispatch, running plate " + Vehicle!.Plate + ".");
+                    if (Vehicle.Stolen && _profile.Has(SuspectTraits.Nervous) && !_ranOnce && Chance(_s.Settings.FleeOnPlateCheck))
+                        return Flee();
+                    StartCheck(Check.Plate, _s.Settings.PlateCheckMs);
+                    return null;
+
+                case Cite:
+                    _s.Notifier.Notify("You hand " + (_knownName?.FirstName ?? "the driver") + " a ~y~citation~s~.");
+                    return InteractionOutcome.Cite;
+
                 case LetGo:
                     return InteractionOutcome.Release;
             }
@@ -308,11 +336,27 @@ namespace Callsign.Core.Interaction
                     _s.Notifier.Notify(_breathResult);
                     break;
 
+                case Check.Plate:
+                    VehicleRecord v = Vehicle!;
+                    _plateResult = "Plate: " + PlateStatus(v) + ", owner " + v.Owner.FullName;
+                    _s.Notifier.Notify("~b~Dispatch:~s~ " + v.Plate + " comes back to a " + v.Model
+                        + ", registered to " + v.Owner.FullName + ". " + PlateStatus(v) + ".");
+                    break;
+
                 case Check.Drugs:
                     _drugResult = "Drug swab: " + (_profile.Has(SuspectTraits.OnDrugs) ? "~r~positive~s~" : "~g~negative~s~");
                     _s.Notifier.Notify(_drugResult);
                     break;
             }
+        }
+
+        static string PlateStatus(VehicleRecord v)
+        {
+            if (v.Stolen) return "~r~reported STOLEN~s~";
+            var problems = new List<string>();
+            if (v.RegistrationExpired) problems.Add("registration expired");
+            if (v.Uninsured) problems.Add("no insurance");
+            return problems.Count == 0 ? "~g~valid~s~" : "~o~" + string.Join(", ", problems) + "~s~";
         }
 
         InteractionOutcome Flee()

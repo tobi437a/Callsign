@@ -16,6 +16,9 @@ namespace Callsign.Core.Callouts
     {
         public enum Phase { OffDuty, Waiting, Offered, Active }
 
+        /// <summary>What <see cref="DutyService.Activity"/> says while a callout runs.</summary>
+        public const string Activity = "callout";
+
         readonly IncidentGenerator _generator;
         readonly DutyService _duty;
         readonly IEventBus _bus;
@@ -59,7 +62,8 @@ namespace Callsign.Core.Callouts
                     Schedule(Settings.FirstOfferMinMs, Settings.FirstOfferMaxMs);
                     break;
                 case Phase.Waiting:
-                    if (_clock.NowMs >= _nextOfferAt) TryOffer();
+                    // Busy with something else (a traffic stop): dispatch holds calls until the officer is free.
+                    if (_clock.NowMs >= _nextOfferAt && !_duty.Busy) TryOffer();
                     break;
                 case Phase.Offered:
                     if (_clock.NowMs >= _offerExpiresAt)
@@ -83,6 +87,11 @@ namespace Callsign.Core.Callouts
         public bool RequestNow(string? situationId = null)
         {
             if (!_duty.OnDuty || Current == Phase.Offered || Current == Phase.Active) return false;
+            if (_duty.Busy)
+            {
+                _services.Notifier.Notify("~c~Dispatch:~s~ finish your " + _duty.Activity + " first.");
+                return false;
+            }
             TryOffer(situationId);
             if (Current == Phase.Offered) return true;
             _services.Notifier.Notify("~c~Dispatch:~s~ no calls in your area right now.");
@@ -93,6 +102,11 @@ namespace Callsign.Core.Callouts
         public bool Accept()
         {
             if (Current != Phase.Offered) return false;
+            if (!_duty.TryBegin(Activity))
+            {
+                _services.Notifier.Notify("~c~Dispatch:~s~ finish your " + _duty.Activity + " first.");
+                return false;
+            }
             Incident incident = Incident!;
             Current = Phase.Active;
             _scene = new CalloutScene(incident, _services);
@@ -125,6 +139,7 @@ namespace Callsign.Core.Callouts
             _scene = null;
             Incident = null;
             Current = Phase.OffDuty;
+            _duty.End(Activity);
         }
 
         /// <summary>The running scene, for dev tools.</summary>
@@ -172,6 +187,7 @@ namespace Callsign.Core.Callouts
             _scene = null;
             Incident = null;
             Current = Phase.Waiting;
+            _duty.End(Activity);
             if (reason == CalloutEndReason.Declined || reason == CalloutEndReason.OfferExpired)
                 Schedule(Settings.RetryMs, Settings.RetryMs * 2);
             else

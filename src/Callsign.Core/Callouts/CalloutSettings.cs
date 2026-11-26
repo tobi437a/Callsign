@@ -31,6 +31,8 @@ namespace Callsign.Core.Callouts
         public float VehicleEscapeDistance { get; set; } = 450;
         /// <summary>A vehicle slower than this (m/s) counts as stopped.</summary>
         public float StoppedSpeed { get; set; } = 1.5f;
+        /// <summary>A vehicle pulling over counts as stopped once it has been this slow for this long.</summary>
+        public long PulledOverMs { get; set; } = 1_000;
         /// <summary>A fleeing vehicle that has stood still this long is abandoned: everyone bails out.</summary>
         public long BailAfterStoppedMs { get; set; } = 2_500;
         /// <summary>A driver who has decided to stop gets out once slower than this (m/s), or after <see cref="StopTimeoutMs"/>.</summary>

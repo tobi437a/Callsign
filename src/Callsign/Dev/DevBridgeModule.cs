@@ -10,6 +10,7 @@ using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
+using Callsign.Core.TrafficStops;
 using Callsign.Engine;
 using Callsign.Modules;
 using Keys = System.Windows.Forms.Keys;
@@ -27,23 +28,25 @@ namespace Callsign.Dev
     {
         public const string Help =
             "ping | state | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
-            + "| tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
+            + "| traffic [model] | stop | onfoot | pick <menuItemId> | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
         readonly CalloutService _callouts;
+        readonly TrafficStopService _stops;
         readonly EntityScopes _scopes;
         readonly KeyInput _input;
         readonly ILog _log;
-        readonly Queue<(string Id, string[] Args)> _queue = new Queue<(string, string[])>();
+        readonly List<(string Id, string[] Args)> _queue = new List<(string, string[])>();
         int _waitUntil;
         int _nextPoll;
 
-        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, EntityScopes scopes, KeyInput input, ILog log)
+        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, EntityScopes scopes, KeyInput input, ILog log)
         {
             _dir = dir;
             _duty = duty;
             _callouts = callouts;
+            _stops = stops;
             _scopes = scopes;
             _input = input;
             _log = log;
@@ -69,13 +72,14 @@ namespace Callsign.Dev
             // A paused game (it pauses on focus loss) would sit in the menu; scripted checks need it running.
             if (Function.Call<bool>(Hash.IS_PAUSE_MENU_ACTIVE)) Function.Call(Hash.SET_FRONTEND_ACTIVE, false);
 
-            (string id, string[] args) = _queue.Dequeue();
+            (string id, string[] args) = _queue[0];
+            _queue.RemoveAt(0);
             string status, text;
             try { (status, text) = ("ok", Run(args)); }
             catch (Exception ex) { (status, text) = ("error", ex.Message); }
             string line = status + " [" + string.Join(" ", args) + "] " + text;
             _log.Info("Dev " + line);
-            File.AppendAllText(ResultsFile, id + " " + line + Environment.NewLine);
+            if (id != "-") File.AppendAllText(ResultsFile, id + " " + line + Environment.NewLine);
         }
 
         public void Stop() { }
@@ -93,7 +97,7 @@ namespace Callsign.Dev
             foreach (string line in lines)
             {
                 string[] parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2) _queue.Enqueue((parts[0], parts.Skip(1).ToArray()));
+                if (parts.Length >= 2) _queue.Add((parts[0], parts.Skip(1).ToArray()));
             }
         }
 
@@ -126,7 +130,38 @@ namespace Callsign.Dev
                     return _callouts.Describe();
                 case "accept": return Check(_callouts.Accept(), "nothing offered");
                 case "decline": return Check(_callouts.Decline(), "nothing offered");
-                case "cancel": return Check(_callouts.Cancel(), "no call running");
+                case "cancel": return Check(_callouts.Cancel() || _stops.Cancel(), "no call or stop running");
+                case "onfoot":
+                    if (player.IsInVehicle()) player.Task.WarpOutOfVehicle(player.CurrentVehicle);
+                    return "";
+
+                case "traffic":   // a car with a driver, a little ahead of the player, driving the same way
+                    if (!player.IsInVehicle()) throw new InvalidOperationException("get in a car first");
+                    Vehicle own = player.CurrentVehicle;
+                    var carModel = new Model(a.Length > 1 ? arg(1) : "asea");
+                    var driverModel = new Model("a_m_y_business_01");
+                    if (!carModel.Request(5000) || !driverModel.Request(5000)) throw new InvalidOperationException("models didn't load");
+                    Vector3 ahead = own.Position + own.ForwardVector * 14f;
+                    Vehicle traffic = World.CreateVehicle(carModel, ahead, own.Heading);
+                    Ped driver = traffic.CreatePedOnSeat(VehicleSeat.Driver, driverModel);
+                    carModel.MarkAsNoLongerNeeded();
+                    driverModel.MarkAsNoLongerNeeded();
+                    traffic.PlaceOnGround();
+                    driver.Task.CruiseWithVehicle(traffic, 8f, VehicleDrivingFlags.DrivingModeStopForVehicles);
+                    driver.MarkAsNoLongerNeeded();   // ambient, like real traffic
+                    traffic.MarkAsNoLongerNeeded();
+                    return traffic.LocalizedName + " " + traffic.Mods.LicensePlate;
+                case "pick":   // choose a menu item by id, by pressing the keys a player would (one per tick)
+                    var interaction = (_callouts.Scene ?? _stops.Scene)?.FocusInteraction;
+                    if (interaction == null || !interaction.MenuOpen) throw new InvalidOperationException("no menu open");
+                    var menu = interaction.Menu;
+                    int target = menu.Items.ToList().FindIndex(i => i.Id == arg(1));
+                    if (target < 0) throw new ArgumentException("no item '" + arg(1) + "' in: " + string.Join(",", menu.Items.Select(i => i.Id)));
+                    int steps = (target - menu.SelectedIndex + menu.Items.Count) % menu.Items.Count;
+                    var keys = Enumerable.Repeat(new[] { "key", "Down" }, steps).Append(new[] { "key", "Return" });
+                    _queue.InsertRange(0, keys.Select(k => ("-", k)));
+                    return menu.Items[target].Label;
+                case "stop": return Check(_stops.TryStart(), "no traffic stop started");
 
                 case "key":
                     var key = (Keys)Enum.Parse(typeof(Keys), arg(1), ignoreCase: true);
@@ -141,13 +176,16 @@ namespace Callsign.Dev
                     Vector3 to;
                     if (arg(1) == "scene")
                     {
-                        CalloutScene scene = _callouts.Scene ?? throw new InvalidOperationException("no scene");
+                        CalloutScene scene = _callouts.Scene ?? _stops.Scene ?? throw new InvalidOperationException("no scene");
                         float back = a.Length > 2 ? Num(arg(2)) : 15f;
                         Vector3 focus = new Vector3(scene.Focus.X, scene.Focus.Y, scene.Focus.Z);
                         Vector3 away = player.Position - focus;
                         away.Z = 0;
                         to = focus + (away.Length() > 0.1f ? away.Normalized : Vector3.RelativeFront) * back;
-                        to = World.GetNextPositionOnStreet(to, true);
+                        Vehicle? at = player.IsInVehicle() ? null : World.GetClosestVehicle(focus, 3f);
+                        if (player.IsInVehicle()) to = World.GetNextPositionOnStreet(to, true);
+                        else if (at != null) to = at.Position - at.RightVector * 1.8f;   // at the driver's door
+                        else to.Z = focus.Z;
                     }
                     else to = new Vector3(Num(arg(1)), Num(arg(2)), Num(arg(3)));
                     Entity mover = player.IsInVehicle() ? (Entity)player.CurrentVehicle : player;
@@ -187,7 +225,9 @@ namespace Callsign.Dev
                 + " player=" + Fmt(p.Position) + (p.IsDead ? " DEAD" : "")
                 + (v != null ? " in=" + v.DisplayName + (v.IsSirenActive ? "+lights" : "") + " " + v.Speed.ToString("0") + "m/s" : " onfoot")
                 + " scopes=" + _scopes.OpenCount
-                + " callout=" + _callouts.Describe();
+                + " busy=" + (_duty.Activity ?? "no")
+                + " callout=" + _callouts.Describe()
+                + " stop=" + _stops.Describe();
         }
 
         static string Check(bool ok, string why) => ok ? "" : throw new InvalidOperationException(why);

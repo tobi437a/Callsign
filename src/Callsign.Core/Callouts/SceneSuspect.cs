@@ -7,7 +7,7 @@ using Callsign.Core.Suspects;
 namespace Callsign.Core.Callouts
 {
     /// <summary>How one suspect's part in a call ended.</summary>
-    internal enum SuspectResult { Arrested, Released, Died, Escaped }
+    internal enum SuspectResult { Arrested, Released, Cited, Died, Escaped }
 
     /// <summary>
     /// One suspect in a running callout: their reaction, the interaction with them and, once
@@ -107,6 +107,9 @@ namespace Callsign.Core.Callouts
             if (Talkable && Ped.InVehicle) Current = State.Seated;
         }
 
+        /// <summary>A passenger the officer had no reason to deal with leaves with the driver.</summary>
+        public void LeaveWithDriver() => Finish(SuspectResult.Released, "The passengers ~g~leave~s~ with the driver.");
+
         /// <summary>The vehicle is getting away and the suspect is still in it.</summary>
         public void EscapedInVehicle() => Finish(SuspectResult.Escaped, "~o~The vehicle got away.~s~");
 
@@ -170,6 +173,9 @@ namespace Callsign.Core.Callouts
                     return false;
                 case InteractionOutcome.Release:
                     Finish(SuspectResult.Released, "Suspect ~g~let go~s~.");
+                    return false;
+                case InteractionOutcome.Cite:
+                    Finish(SuspectResult.Cited, "Citation ~y~issued~s~.");
                     return false;
                 case InteractionOutcome.Fled:
                     Behaviour = SuspectBehaviour.Flee;

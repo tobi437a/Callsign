@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Callsign.Core.Entities;
 using Callsign.Core.World;
 
@@ -59,6 +60,9 @@ namespace Callsign.Core.Ports
         /// <summary>Pulls over to the side of the road and stops there.</summary>
         void PullOver();
 
+        /// <summary>Stays stopped at the wheel with the engine off (pulled over, waiting for the officer).</summary>
+        void WaitInVehicle();
+
         /// <summary>Shoots at the player from their seat (a passenger with a gun). Stays in the vehicle.</summary>
         void ShootFromVehicle();
 
@@ -83,11 +87,17 @@ namespace Callsign.Core.Ports
         bool InPlayerVehicle { get; }
     }
 
-    /// <summary>A vehicle we spawned. All members are safe to use after the vehicle is gone.</summary>
+    /// <summary>A vehicle we spawned (or took over). All members are safe to use after the vehicle is gone.</summary>
     public interface IVehicle : ITracked
     {
         bool Exists { get; }
         Position Position { get; }
+
+        /// <summary>The licence plate text.</summary>
+        string Plate { get; }
+
+        /// <summary>What it is, as a player would name it (e.g. "Futo").</summary>
+        string Model { get; }
 
         /// <summary>Metres per second.</summary>
         float Speed { get; }
@@ -136,6 +146,17 @@ namespace Callsign.Core.Ports
     {
         /// <exception cref="System.ArgumentException">The model name is not a vehicle model.</exception>
         bool TrySpawn(EntityScope scope, string model, Position at, float heading, out IVehicle? vehicle);
+    }
+
+    /// <summary>The traffic around the player.</summary>
+    public interface ITraffic
+    {
+        /// <summary>
+        /// Takes over the vehicle driving just ahead of the player's vehicle (within
+        /// <paramref name="maxDistance"/>, roughly the same way), with everyone in it, into
+        /// <paramref name="scope"/>. False if there is none. <paramref name="occupants"/> start with the driver.
+        /// </summary>
+        bool TryTakeVehicleAhead(EntityScope scope, float maxDistance, out IVehicle? vehicle, out IReadOnlyList<IPed> occupants);
     }
 
     /// <summary>Creates map markers into a scope.</summary>
