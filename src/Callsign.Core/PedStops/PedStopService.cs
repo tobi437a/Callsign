@@ -23,7 +23,7 @@ namespace Callsign.Core.PedStops
     /// Pedestrian stops: on duty and on foot, the player holds the interact key next to someone.
     /// They get hidden traits like any suspect, and those decide whether they stand and talk, run
     /// or (armed and wanted) fight. From there it is the same scene and interaction menu as a
-    /// callout suspect (ID, questions, records check, tests, pat-down, arrest or let go).
+    /// callout suspect (ID, questions, records check, tests, pat-down, then arrest, cite or let go).
     /// </summary>
     public sealed class PedStopService
     {
@@ -122,7 +122,8 @@ namespace Callsign.Core.PedStops
         {
             var results = scene.Results.ToList();
             if (results.Contains(SuspectResult.Arrested)) return PedStopResult.Arrested;
-            if (results.Contains(SuspectResult.Released) || results.Contains(SuspectResult.Cited)) return PedStopResult.Released;
+            if (results.Contains(SuspectResult.Cited)) return PedStopResult.Cited;
+            if (results.Contains(SuspectResult.Released)) return PedStopResult.Released;
             if (results.Contains(SuspectResult.Died)) return PedStopResult.SuspectDied;
             return PedStopResult.Escaped;
         }

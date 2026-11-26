@@ -115,7 +115,7 @@ namespace Callsign.Core.Interaction
 
         public SuspectProfile Profile => _profile;
 
-        /// <summary>The vehicle they were driving, if any: adds a plate check and a citation to the menu.</summary>
+        /// <summary>The vehicle they were driving, if any: adds a plate check to the menu.</summary>
         public VehicleRecord? Vehicle { get; set; }
 
         /// <summary>The player has opened the menu on them at least once.</summary>
@@ -251,8 +251,8 @@ namespace Callsign.Core.Interaction
             if (seated) yield return new MenuItem(StepOut, "Order them out of the vehicle");
             yield return new MenuItem(Search, seated ? "Pat down (order them out first)" : "Pat down", !seated);
             yield return new MenuItem(Arrest, "~r~Arrest~s~");
-            if (Vehicle != null) yield return new MenuItem(Cite, "~y~Issue a citation~s~");
-            yield return new MenuItem(LetGo, Vehicle != null ? "~g~Let them go with a warning~s~" : "~g~Let them go~s~");
+            yield return new MenuItem(Cite, "~y~Issue a citation~s~");
+            yield return new MenuItem(LetGo, "~g~Let them go with a warning~s~");
         }
 
         bool DrugKitNear() =>
@@ -332,7 +332,7 @@ namespace Callsign.Core.Interaction
                     return null;
 
                 case Cite:
-                    _s.Notifier.Notify("You hand " + (_knownName?.FirstName ?? "the driver") + " a ~y~citation~s~.");
+                    _s.Notifier.Notify("You hand " + (_knownName?.FirstName ?? (Vehicle != null ? "the driver" : "them")) + " a ~y~citation~s~.");
                     return InteractionOutcome.Cite;
 
                 case LetGo:

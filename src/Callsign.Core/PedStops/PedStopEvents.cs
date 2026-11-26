@@ -5,7 +5,9 @@ namespace Callsign.Core.PedStops
     {
         /// <summary>The person was arrested and booked.</summary>
         Arrested,
-        /// <summary>Let go.</summary>
+        /// <summary>They got a citation.</summary>
+        Cited,
+        /// <summary>Let go with a warning.</summary>
         Released,
         /// <summary>They got away.</summary>
         Escaped,

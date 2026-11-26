@@ -130,7 +130,7 @@ public class PedStopServiceTests
         Assert.NotNull(_menu.Last);
         Choose(SuspectInteraction.AskId);
         Assert.Contains(_notifier.Messages, m => m.Contains("ID card"));
-        Assert.DoesNotContain(_menu.Last!.Items, i => i.Id == SuspectInteraction.Cite || i.Id == SuspectInteraction.RunPlate);
+        Assert.DoesNotContain(_menu.Last!.Items, i => i.Id == SuspectInteraction.RunPlate);
 
         Choose(SuspectInteraction.LetGo);
         Assert.Equal(PedStopResult.Released, Ended().Result);
@@ -138,6 +138,19 @@ public class PedStopServiceTests
         Assert.False(_duty.Busy);
         Assert.Equal(0, _scopes.OpenCount);
         Assert.Equal(ReleaseMode.Dismiss, ped.Released);
+    }
+
+    [Fact]
+    public void APedestrianCanBeCited()
+    {
+        FakePed ped = Patrol();
+        Tick(stop: true);
+        Tick(interact: true);
+        Choose(SuspectInteraction.Cite);
+
+        Assert.Equal(PedStopResult.Cited, Ended().Result);
+        Assert.Contains(_notifier.Messages, m => m.Contains("citation"));
+        Assert.Equal(0, _scopes.OpenCount);
     }
 
     [Fact]
