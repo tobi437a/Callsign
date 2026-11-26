@@ -116,6 +116,15 @@ public class IncidentGeneratorTests
     }
 
     [Fact]
+    public void CanBeLimitedToOneSituation()
+    {
+        var generator = new IncidentGenerator(Parts(), new SeededRandom(1));
+
+        Assert.Equal("shoplifter", generator.Generate(Player, 100, 1500, situationId: "shoplifter")!.Situation.Id);
+        Assert.Null(generator.Generate(Player, 100, 1500, situationId: "no-such-call"));
+    }
+
+    [Fact]
     public void SkipsSituationsWithNoFittingOutcome()
     {
         var parts = Parts();

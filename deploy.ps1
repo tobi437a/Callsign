@@ -1,6 +1,6 @@
 # Builds + tests, then installs into the game:
 #   <GTA V>\scripts\     Callsign.dll, Callsign.API.dll   (SHVDN loads these)
-#   <GTA V>\Callsign\   Data\ (from data\), Plugins\, Callsign.log
+#   <GTA V>\Callsign\   Data\ (from data\), Plugins\, Dev\ (dev bridge), Callsign.log
 # Works while the game is running: press Insert in-game to reload.
 #   -WithExamplePlugin   also install samples\ExamplePlugin into Callsign\Plugins\
 #   -NoExamplePlugin     remove it again
@@ -32,7 +32,8 @@ foreach ($f in "Callsign.dll", "Callsign.pdb", "Callsign.API.dll", "Callsign.API
     Write-Host "deployed   scripts\$f"
 }
 
-New-Item -ItemType Directory -Force (Join-Path $home_ "Data"), (Join-Path $home_ "Plugins") | Out-Null
+# Dev\ turns on the dev bridge that tools\game.ps1 drives. Player installs don't have it.
+New-Item -ItemType Directory -Force (Join-Path $home_ "Data"), (Join-Path $home_ "Plugins"), (Join-Path $home_ "Dev") | Out-Null
 $data = Join-Path $root "data"
 if (Get-ChildItem $data -File -Recurse -ErrorAction SilentlyContinue) {
     Copy-Item (Join-Path $data "*") -Destination (Join-Path $home_ "Data") -Recurse -Force

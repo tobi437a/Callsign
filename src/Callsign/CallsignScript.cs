@@ -17,6 +17,7 @@ using Callsign.Core.Events;
 using Callsign.Core.Interaction;
 using Callsign.Core.Suspects;
 using Callsign.Core.Ports;
+using Callsign.Dev;
 using Callsign.Engine;
 using Callsign.Modules;
 using Callsign.Plugins;
@@ -63,7 +64,9 @@ namespace Callsign
                 interaction, custody);
             var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
 
-            // --- modules, in tick order (plugins last) ---
+            // --- modules, in tick order (dev bridge first so its keys count this tick; plugins last) ---
+            if (System.IO.Directory.Exists(paths.Dev))
+                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, _scopes, _input, _log));
             _modules.Add(new DutyModule(duty, bus, _input));
             _modules.Add(new CalloutsModule(callouts, _input));
             _modules.Add(new PluginsModule(paths.Plugins, duty, parts, callouts, bus, _log));
