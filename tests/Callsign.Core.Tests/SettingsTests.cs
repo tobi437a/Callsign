@@ -68,10 +68,10 @@ public class SettingsTests
         Assert.Equal(["0", SettingsMenu.CloseId], menu.Menu.Items.Select(i => i.Id));
         menu.Tick(Select);                      // open "Callouts"
         Assert.Equal("Callouts", menu.Menu.Title);
-        // Sorted by title: Disturbance, Shoplifting, then "Switch all on" (disabled while all are on).
-        Assert.Equal([CalloutsSettingsPage.ItemId("fight"), CalloutsSettingsPage.ItemId("theft"), CalloutsSettingsPage.AllOnId],
+        // Sorted by title: Disturbance, Shoplifting, then the switch-all item.
+        Assert.Equal([CalloutsSettingsPage.ItemId("fight"), CalloutsSettingsPage.ItemId("theft"), CalloutsSettingsPage.AllId],
             menu.Menu.Items.Select(i => i.Id));
-        Assert.False(menu.Menu.Items[2].Enabled);
+        Assert.Equal("Switch all off", menu.Menu.Items[2].Label);
 
         menu.Tick(Down);
         menu.Tick(Select);                      // Shoplifting off
@@ -79,9 +79,16 @@ public class SettingsTests
         Assert.Equal("~r~Off", menu.Menu.Items[1].Value);
         Assert.Equal(1, store.Saves);
         Assert.Equal(1, changes);
+        Assert.Equal("Switch all on", menu.Menu.Items[2].Label);
 
         menu.Tick(Down);
         menu.Tick(Select);                      // Switch all on
+        Assert.Empty(store.Saved.Callouts.Disabled);
+        Assert.Equal("Switch all off", menu.Menu.Items[2].Label);
+
+        menu.Tick(Select);                      // Switch all off
+        Assert.Equal(["fight", "theft"], store.Saved.Callouts.Disabled.Order());
+        menu.Tick(Select);                      // ... and on again
         Assert.Empty(store.Saved.Callouts.Disabled);
 
         menu.Tick(Back);
