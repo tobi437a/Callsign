@@ -45,6 +45,9 @@ namespace Callsign.Core.Suspects
     /// <summary>A weapon a suspect can hide: game name and how a search describes it.</summary>
     public sealed record HiddenWeapon(string Weapon, string Name);
 
+    /// <summary>Drugs a suspect can carry: how a search describes them, and what they are (None = unknown).</summary>
+    public sealed record DrugItem(string Name, Drug Drug);
+
     /// <summary>The word lists suspects are built from. Loaded from <c>Data\Suspects\*.xml</c>; files add up.</summary>
     public sealed class SuspectContent
     {
@@ -53,7 +56,7 @@ namespace Callsign.Core.Suspects
         public List<string> LastNames { get; } = new List<string>();
         public List<string> WarrantOffences { get; } = new List<string>();
         public List<string> PocketItems { get; } = new List<string>();
-        public List<string> DrugItems { get; } = new List<string>();
+        public List<DrugItem> DrugItems { get; } = new List<DrugItem>();
         public List<HiddenWeapon> HiddenWeapons { get; } = new List<HiddenWeapon>();
         public List<DialogueLine> Lines { get; } = new List<DialogueLine>();
 
@@ -77,6 +80,7 @@ namespace Callsign.Core.Suspects
     /// &lt;SuspectContent&gt;
     ///   &lt;MaleNames&gt;James, Carlos&lt;/MaleNames&gt;
     ///   &lt;Warrants&gt;failure to appear, unpaid fines&lt;/Warrants&gt;
+    ///   &lt;DrugItem drug="Cocaine" name="a small bag of white powder" /&gt;
     ///   &lt;HiddenWeapon weapon="WEAPON_SWITCHBLADE" name="a switchblade" /&gt;
     ///   &lt;Line topic="Purpose" trait="Nervous"&gt;N-nothing. Why?&lt;/Line&gt;
     /// &lt;/SuspectContent&gt;
@@ -118,7 +122,17 @@ namespace Callsign.Core.Suspects
             content.LastNames.AddRange(x.LastNames.SelectMany(List));
             content.WarrantOffences.AddRange(x.Warrants.SelectMany(List));
             content.PocketItems.AddRange(x.PocketItems.SelectMany(List));
-            content.DrugItems.AddRange(x.DrugItems.SelectMany(List));
+            content.DrugItems.AddRange(x.DrugItemLists.SelectMany(List).Select(n => new DrugItem(n, Drug.None)));
+            foreach (var d in x.DrugItems)
+            {
+                Drug drug = Drug.None;
+                if (string.IsNullOrWhiteSpace(d.Name))
+                    log.Warn(sourceName + ": skipped drug item without a name");
+                else if (!string.IsNullOrWhiteSpace(d.Drug) && !(Enum.TryParse(d.Drug, true, out drug) && DrugPanel.All.Contains(drug)))
+                    log.Warn(sourceName + ": skipped drug item with unknown drug '" + d.Drug + "'");
+                else
+                    content.DrugItems.Add(new DrugItem(d.Name!.Trim(), drug));
+            }
 
             foreach (var w in x.HiddenWeapons)
             {
@@ -169,7 +183,8 @@ namespace Callsign.Core.Suspects
         [XmlElement("LastNames")] public List<string> LastNames { get; set; } = new List<string>();
         [XmlElement("Warrants")] public List<string> Warrants { get; set; } = new List<string>();
         [XmlElement("PocketItems")] public List<string> PocketItems { get; set; } = new List<string>();
-        [XmlElement("DrugItems")] public List<string> DrugItems { get; set; } = new List<string>();
+        [XmlElement("DrugItems")] public List<string> DrugItemLists { get; set; } = new List<string>();
+        [XmlElement("DrugItem")] public List<DrugItemXml> DrugItems { get; set; } = new List<DrugItemXml>();
         [XmlElement("HiddenWeapon")] public List<HiddenWeaponXml> HiddenWeapons { get; set; } = new List<HiddenWeaponXml>();
         [XmlElement("Line")] public List<LineXml> Lines { get; set; } = new List<LineXml>();
     }
@@ -177,6 +192,12 @@ namespace Callsign.Core.Suspects
     public sealed class HiddenWeaponXml
     {
         [XmlAttribute("weapon")] public string? Weapon { get; set; }
+        [XmlAttribute("name")] public string? Name { get; set; }
+    }
+
+    public sealed class DrugItemXml
+    {
+        [XmlAttribute("drug")] public string? Drug { get; set; }
         [XmlAttribute("name")] public string? Name { get; set; }
     }
 

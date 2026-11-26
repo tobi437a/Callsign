@@ -1,0 +1,28 @@
+# Pull a car over, walk up, take a drug swab (the patrol car is close behind): the result lists every substance on the panel.
+# Leaves the stop open so the result can be looked at (game.ps1 shot); end it with: cmd pick release
+mark scenario drug-swab
+god on
+tp 430 -1426 29
+car police3
+duty on
+lights on
+wait 300
+traffic
+wait 1500
+key ShiftKey 700
+wait 1200
+expect busy=traffic stop
+wait 20000
+expect vehicle=Stopped
+tp scene 8
+wait 500
+onfoot
+wait 1500
+tp scene 2
+wait 500
+key E
+wait 300
+expect [menu]
+pick drugs
+wait 6500
+expect [menu]

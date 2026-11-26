@@ -267,7 +267,14 @@ namespace Callsign.Dev
                         Vector3 away = player.Position - focus;
                         away.Z = 0;
                         to = focus + (away.Length() > 0.1f ? away.Normalized : Vector3.RelativeFront) * back;
-                        Vehicle? at = player.IsInVehicle() ? null : World.GetClosestVehicle(focus, 3f);
+                        Vehicle? at = World.GetClosestVehicle(focus, 3f);
+                        if (player.IsInVehicle() && at != null && at != player.CurrentVehicle)
+                        {
+                            // Park straight behind the scene's vehicle, same heading.
+                            player.CurrentVehicle.Position = at.Position - at.ForwardVector * back;
+                            player.CurrentVehicle.Heading = at.Heading;
+                            return Fmt(player.CurrentVehicle.Position);
+                        }
                         if (player.IsInVehicle()) to = World.GetNextPositionOnStreet(to, true);
                         else if (at != null) to = at.Position - at.RightVector * 1.8f;   // at the driver's door
                         else to.Z = focus.Z;

@@ -19,7 +19,7 @@ namespace Callsign.Core.Suspects
         NoId = 1 << 2,
         /// <summary>Has been drinking: over the limit on a breath test.</summary>
         Intoxicated = 1 << 3,
-        /// <summary>Under the influence of drugs: a drug swab comes back positive.</summary>
+        /// <summary>Under the influence of drugs: a drug swab comes back positive (see <see cref="SuspectProfile.Drugs"/>).</summary>
         OnDrugs = 1 << 4,
         /// <summary>Has drugs in their pockets.</summary>
         CarryingDrugs = 1 << 5,
@@ -42,8 +42,9 @@ namespace Callsign.Core.Suspects
         public const double LegalAlcoholLimit = 0.08;
 
         public SuspectProfile(Identity real, Identity stated, SuspectTraits traits, double bloodAlcohol,
-            string? warrantOffence, string? concealedWeapon, string? concealedWeaponName, IReadOnlyList<string> pockets)
+            string? warrantOffence, string? concealedWeapon, string? concealedWeaponName, IReadOnlyList<string> pockets, Drug drugs = Drug.None)
         {
+            if (drugs != Drug.None) traits |= SuspectTraits.OnDrugs;
             Real = real;
             Stated = stated;
             Traits = traits;
@@ -52,6 +53,7 @@ namespace Callsign.Core.Suspects
             ConcealedWeapon = concealedWeapon;
             ConcealedWeaponName = concealedWeaponName;
             Pockets = pockets;
+            Drugs = drugs;
         }
 
         /// <summary>Their real identity (what the records say).</summary>
@@ -73,6 +75,9 @@ namespace Callsign.Core.Suspects
 
         /// <summary>How a search describes the hidden weapon, e.g. "a switchblade".</summary>
         public string? ConcealedWeaponName { get; }
+
+        /// <summary>What is in their system: each one shows up positive on a drug swab.</summary>
+        public Drug Drugs { get; }
 
         /// <summary>What a pat-down turns up, drugs and weapon included.</summary>
         public IReadOnlyList<string> Pockets { get; }

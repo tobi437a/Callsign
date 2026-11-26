@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  What suspects are made of: names, warrants, pocket contents, hidden weapons and dialogue.
+  What suspects are made of: names, warrants, pocket contents, drugs, hidden weapons and dialogue.
   Lists are comma-separated. Every file in this folder adds to the lists.
 
   Dialogue: <Line topic="..." trait="...">. Topics: Stopped, Purpose, Drinking, HandsId, NoId, StepOut.
@@ -20,7 +20,17 @@
   <Warrants>failure to appear in court, unpaid traffic fines, probation violation, petty theft, burglary, assault, possession of a controlled substance, driving on a suspended licence, vandalism, receiving stolen property, domestic battery, check fraud</Warrants>
 
   <PocketItems>a wallet, a phone, a set of keys, a lighter, a pack of cigarettes, some loose change, chewing gum, a bus pass, earphones, a crumpled receipt, a lottery ticket, a pack of mints</PocketItems>
-  <DrugItems>a small bag of white powder, a baggie of weed, pills in an unmarked bottle, a glass pipe with residue, several small baggies of crystals</DrugItems>
+  <!-- drug = what it is (Cannabis, Cocaine, Methamphetamine, Opiates, Benzodiazepines). Users mostly carry what they took. -->
+  <DrugItem drug="Cannabis"        name="a baggie of weed" />
+  <DrugItem drug="Cannabis"        name="a half-smoked joint" />
+  <DrugItem drug="Cannabis"        name="a jar of buds and a grinder" />
+  <DrugItem drug="Cocaine"         name="a small bag of white powder" />
+  <DrugItem drug="Cocaine"         name="a rolled-up bill and a folded wrap of powder" />
+  <DrugItem drug="Methamphetamine" name="several small baggies of crystals" />
+  <DrugItem drug="Methamphetamine" name="a glass pipe with burnt residue" />
+  <DrugItem drug="Opiates"         name="loose pills in an unmarked bottle" />
+  <DrugItem drug="Opiates"         name="a burnt spoon and a syringe" />
+  <DrugItem drug="Benzodiazepines" name="a blister pack of someone else's prescription pills" />
 
   <HiddenWeapon weapon="WEAPON_SWITCHBLADE" name="a switchblade" />
   <HiddenWeapon weapon="WEAPON_KNIFE"       name="a kitchen knife" />

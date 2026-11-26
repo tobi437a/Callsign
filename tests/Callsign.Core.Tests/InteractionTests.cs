@@ -30,12 +30,12 @@ public class InteractionTests
     SuspectInteraction _interaction = null!;
 
     void Create(SuspectTraits traits, double roll = 0.99, double bac = 0, IReadOnlyList<string>? pockets = null,
-        string? hiddenWeapon = null)
+        string? hiddenWeapon = null, Drug drugs = Drug.None)
     {
         bool lies = (traits & SuspectTraits.FalseName) != 0;
         var profile = new SuspectProfile(Real, lies ? Fake : Real, traits, bac,
             (traits & SuspectTraits.Warrant) != 0 ? "burglary" : null,
-            hiddenWeapon, hiddenWeapon != null ? "a switchblade" : null, pockets ?? []);
+            hiddenWeapon, hiddenWeapon != null ? "a switchblade" : null, pockets ?? [], drugs);
         var content = new SuspectContent();
         content.Lines.Add(new DialogueLine(DialogueTopic.NoId, SuspectTraits.None, "I'm {name}."));
         var random = new FixedRandom(roll);
@@ -160,7 +160,7 @@ public class InteractionTests
     [Fact]
     public void DrugSwabNeedsTheVehicleNearby()
     {
-        Create(SuspectTraits.OnDrugs);
+        Create(SuspectTraits.None, drugs: Drug.Cocaine | Drug.Cannabis);
         StopAndOpen();
         Assert.False(Item(SuspectInteraction.DrugSwab).Enabled);
 
@@ -171,7 +171,29 @@ public class InteractionTests
         _clock.NowMs += _settings.DrugSwabMs;
         Tick();
 
-        Assert.Contains("positive", Item(SuspectInteraction.DrugSwab).Label);
+        string label = Item(SuspectInteraction.DrugSwab).Label;
+        Assert.Contains("THC", label);
+        Assert.Contains("Cocaine", label);
+        Assert.DoesNotContain("Opiates", label);
+        string panel = _notifier.Messages.Last(m => m.Contains("Drug swab"));
+        Assert.Contains("Cocaine: ~r~POSITIVE", panel);
+        Assert.Contains("THC: ~r~POSITIVE", panel);
+        Assert.Contains("Opiates: ~g~negative", panel);
+        Assert.Contains("Benzodiazepines: ~g~negative", panel);
+    }
+
+    [Fact]
+    public void CleanSuspectTestsNegativeOnTheWholePanel()
+    {
+        Create(SuspectTraits.None);
+        _world.PlayerVehicle = new Position(10, 0, 0);
+        StopAndOpen();
+        Choose(SuspectInteraction.DrugSwab);
+        _clock.NowMs += _settings.DrugSwabMs;
+        Tick();
+
+        Assert.Contains("all negative", Item(SuspectInteraction.DrugSwab).Label);
+        Assert.DoesNotContain(_notifier.Messages, m => m.Contains("POSITIVE"));
     }
 
     [Fact]

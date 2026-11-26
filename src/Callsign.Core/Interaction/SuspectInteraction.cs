@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Callsign.Core.Ports;
 using Callsign.Core.Suspects;
 using Callsign.Core.Ui;
@@ -367,8 +368,10 @@ namespace Callsign.Core.Interaction
                     break;
 
                 case Check.Drugs:
-                    _drugResult = "Drug swab: " + (_profile.Has(SuspectTraits.OnDrugs) ? "~r~positive~s~" : "~g~negative~s~");
-                    _s.Notifier.Notify(_drugResult);
+                    var positive = DrugPanel.In(_profile.Drugs).Select(DrugPanel.Name).ToList();
+                    _drugResult = "Drug swab: " + (positive.Count == 0 ? "~g~all negative~s~" : "~r~" + string.Join(", ", positive) + "~s~");
+                    _s.Notifier.Notify("~b~Drug swab~s~" + string.Concat(DrugPanel.All.Select(d =>
+                        "~n~" + DrugPanel.Name(d) + ": " + ((_profile.Drugs & d) != 0 ? "~r~POSITIVE~s~" : "~g~negative~s~"))));
                     break;
             }
         }
