@@ -51,7 +51,7 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 While on duty, dispatch offers a call every minute or two: accept it and follow the yellow route.
 Suspects may cooperate, run or fight. Pull vehicles over with your emergency lights. Stop people
 with `E` and work out what they're hiding through the menu (ID, questions, records check, tests,
-pat-down), then arrest them or let them go. Arrested suspects ride in your back seat to the station.
+pat-down), then arrest, cite or let them go. Arrested suspects ride in your back seat to the station.
 Between calls, turn on your lights behind any car and hold `Shift` to pull it over: run the plate,
 check the driver, then cite, warn or arrest. Most drivers stop; ones with something to hide may not.
 On foot, walk up to anyone and hold `E` to stop them for a chat: same menu, same hidden secrets.

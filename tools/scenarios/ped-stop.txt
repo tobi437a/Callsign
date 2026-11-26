@@ -1,4 +1,4 @@
-# On foot next to a passer-by: hold E to stop them, tap E for the menu, ask for ID, run the name, let them go: the stop ends and cleans up.
+# On foot next to a passer-by: hold E to stop them, tap E for the menu, ask for ID, run the name, write them a citation: the stop ends and cleans up.
 # Their reaction is rolled from hidden traits, so now and then they run or fight instead (rerun).
 mark scenario ped-stop
 god on
@@ -22,7 +22,7 @@ wait 500
 pick records
 wait 5500
 state
-pick release
+pick cite
 wait 1000
 expect busy=no
 expect pedstop=none
