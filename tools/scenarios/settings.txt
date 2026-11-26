@@ -1,0 +1,22 @@
+# Settings menu (F6): switch "Shoplifting" off and on again, check the menu shows it, close with Backspace.
+# Leaves every callout on (the setting is saved to Callsign\settings.xml).
+mark scenario settings
+expect settings=closed
+key F6
+wait 300
+expect settings=[Callsign settings
+pick 0
+wait 500
+expect situation:shoplifting=On
+pick situation:shoplifting
+wait 500
+expect situation:shoplifting=Off
+pick situation:shoplifting
+wait 500
+expect situation:shoplifting=On
+key Back
+wait 300
+expect settings=[Callsign settings
+key Back
+wait 300
+expect settings=closed

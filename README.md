@@ -45,6 +45,7 @@ The mod creates a `<GTA V folder>\Callsign\` folder on first start, with a `Plug
 | `Up` / `Down`, `Enter`, `Backspace` | Move through the menu, choose, close. |
 | `End` | Call off the current callout or traffic stop. |
 | `F9` | Ask dispatch for a call right now. |
+| `F6` | Settings (e.g. switch single callouts off). Saved in `Callsign\settings.xml`. |
 
 ### How to play
 While on duty, dispatch offers a call every minute or two: accept it and follow the yellow route.

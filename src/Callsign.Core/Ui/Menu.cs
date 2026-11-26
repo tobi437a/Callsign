@@ -5,7 +5,8 @@ using System.Linq;
 namespace Callsign.Core.Ui
 {
     /// <summary>One entry in a <see cref="Menu"/>. <paramref name="Id"/> is what the owner reacts to.</summary>
-    public sealed record MenuItem(string Id, string Label, bool Enabled = true);
+    /// <param name="Value">Shown on the right of the row (a setting's current value), or null.</param>
+    public sealed record MenuItem(string Id, string Label, bool Enabled = true, string? Value = null);
 
     /// <summary>Keys for a menu this frame.</summary>
     public readonly record struct MenuInput(bool Up = false, bool Down = false, bool Select = false, bool Back = false);
@@ -21,6 +22,9 @@ namespace Callsign.Core.Ui
         public Menu(string title) { Title = title; }
 
         public string Title { get; set; }
+
+        /// <summary>The key help under the list, or null for the view's default.</summary>
+        public string? Hint { get; set; }
 
         public IReadOnlyList<MenuItem> Items => _items;
 

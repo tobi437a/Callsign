@@ -1,0 +1,48 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Callsign.Core.Callouts;
+using Callsign.Core.Ui;
+
+namespace Callsign.Core.Settings
+{
+    /// <summary>Switches single callouts on or off: one item per registered situation, built-in and plugin ones alike.</summary>
+    public sealed class CalloutsSettingsPage : ISettingsPage
+    {
+        public const string AllOnId = "all-on";
+        const string SituationPrefix = "situation:";
+
+        readonly CalloutParts _parts;
+        readonly SettingsService _settings;
+
+        public CalloutsSettingsPage(CalloutParts parts, SettingsService settings)
+        {
+            _parts = parts;
+            _settings = settings;
+        }
+
+        public string Title => "Callouts";
+
+        /// <summary>The menu item id for a situation.</summary>
+        public static string ItemId(string situationId) => SituationPrefix + situationId;
+
+        public IEnumerable<MenuItem> Items()
+        {
+            CalloutPreferences prefs = _settings.Current.Callouts;
+            foreach (SituationPart s in _parts.Situations.All.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
+                yield return new MenuItem(ItemId(s.Id), s.Title, Value: prefs.IsEnabled(s.Id) ? "~g~On" : "~r~Off");
+            yield return new MenuItem(AllOnId, "Switch all on", prefs.Disabled.Count > 0);
+        }
+
+        public void Choose(string id)
+        {
+            if (id == AllOnId)
+                _settings.Change(s => s.Callouts.Disabled.Clear());
+            else if (id.StartsWith(SituationPrefix, StringComparison.Ordinal))
+            {
+                string situation = id.Substring(SituationPrefix.Length);
+                _settings.Change(s => s.Callouts.SetEnabled(situation, !s.Callouts.IsEnabled(situation)));
+            }
+        }
+    }
+}

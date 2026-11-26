@@ -18,6 +18,7 @@ using Callsign.Core.Interaction;
 using Callsign.Core.Suspects;
 using Callsign.Core.TrafficStops;
 using Callsign.Core.Ports;
+using Callsign.Core.Settings;
 using Callsign.Dev;
 using Callsign.Engine;
 using Callsign.Modules;
@@ -42,6 +43,7 @@ namespace Callsign
             var duty = new DutyService(bus);
             _scopes = new EntityScopes(_log);
             var random = new SeededRandom();
+            var settings = new SettingsService(new SettingsFile(paths.SettingsFile, _log), bus);
 
             var parts = new CalloutParts();
             int partCount = CalloutContentLoader.LoadDirectory(System.IO.Path.Combine(paths.Data, "Callouts"), parts, _log);
@@ -58,17 +60,23 @@ namespace Callsign
             var notifier = new GameNotifier();
             var clock = new GameClock();
             var custody = new CustodyServices(world, blips, notifier, clock, stations, new CustodySettings());
-            var interaction = new InteractionServices(world, notifier, new GameMenuView(), clock, random,
+            var menuView = new GameMenuView();
+            var interaction = new InteractionServices(world, notifier, menuView, clock, random,
                 new Dialogue(suspectContent, random), new InteractionSettings());
             var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameVehicleFactory(), blips,
                 world, notifier, clock, random, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
                 interaction, custody);
-            var callouts = new CalloutService(new IncidentGenerator(parts, random), duty, bus, clock, random, sceneServices);
+            var callouts = new CalloutService(new IncidentGenerator(parts, random, s => settings.Current.Callouts.IsEnabled(s.Id)), duty, bus, clock, random, sceneServices);
             var trafficStops = new TrafficStopService(duty, bus, new GameTraffic(), sceneServices);
+            // New settings: add items to a page, or a page here.
+            var settingsMenu = new SettingsMenu(new ISettingsPage[] { new CalloutsSettingsPage(parts, settings) });
 
-            // --- modules, in tick order (dev bridge first so its keys count this tick; plugins last) ---
+            // --- modules, in tick order (dev bridge first so its keys count this tick; settings before
+            //     the gameplay modules so an open settings menu keeps its keys; plugins last) ---
             if (System.IO.Directory.Exists(paths.Dev))
-                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, trafficStops, _scopes, _input, _log));
+                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, trafficStops, settingsMenu, _scopes, _input, _log));
+            _modules.Add(new SettingsModule(settingsMenu, menuView, _input,
+                () => (callouts.Scene ?? trafficStops.Scene)?.FocusInteraction?.MenuOpen == true));
             _modules.Add(new DutyModule(duty, bus, _input));
             _modules.Add(new CalloutsModule(callouts, _input));
             _modules.Add(new TrafficStopsModule(trafficStops, _input));
