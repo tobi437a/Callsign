@@ -7,6 +7,7 @@ using GTA;
 using GTA.Math;
 using GTA.Native;
 using Callsign.Core.Callouts;
+using Callsign.Core.Director;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
@@ -34,6 +35,7 @@ namespace Callsign.Dev
         readonly string _dir;
         readonly DutyService _duty;
         readonly CalloutService _callouts;
+        readonly PacingDirector _director;
         readonly TrafficStopService _stops;
         readonly SettingsMenu _settings;
         readonly EntityScopes _scopes;
@@ -46,12 +48,13 @@ namespace Callsign.Dev
         readonly List<(Vector3 At, System.Drawing.Color Color)> _markers = new List<(Vector3, System.Drawing.Color)>();
         int _nextPoll;
 
-        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
+        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, PacingDirector director, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
         {
             _settings = settings;
             _dir = dir;
             _duty = duty;
             _callouts = callouts;
+            _director = director;
             _stops = stops;
             _scopes = scopes;
             _input = input;
@@ -327,6 +330,7 @@ namespace Callsign.Dev
                 + " busy=" + (_duty.Activity ?? "no")
                 + " callout=" + _callouts.Describe()
                 + " stop=" + _stops.Describe()
+                + " director=[" + _director.Describe() + "]"
                 + " settings=" + (_settings.IsOpen ? "[" + _settings.Menu.Title + ": " + string.Join(",", _settings.Menu.Items.Select(i => i.Id + (i.Value != null ? "=" + i.Value.Replace("~g~", "").Replace("~r~", "") : ""))) + "]" : "closed");
         }
 

@@ -59,6 +59,13 @@ namespace Callsign.API.Callouts
 
         /// <summary>Most suspects (<see cref="MinSuspects"/> to 4). 0 (default) = same as <see cref="MinSuspects"/>. Since API 0.4.</summary>
         public int MaxSuspects { get; set; }
+
+        /// <summary>
+        /// 0 to 1: how big a call this is, for pacing. Dispatch sends calm calls after intense ones and
+        /// bigger ones after a quiet spell. Built-in: 0.15 suspicious person, 0.5 stolen vehicle,
+        /// 0.9 shots fired from a vehicle. Default 0.3. Since API 0.5.
+        /// </summary>
+        public double Intensity { get; set; } = 0.3;
     }
 
     /// <summary>A place where incidents can happen.</summary>

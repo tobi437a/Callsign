@@ -61,6 +61,7 @@ namespace Callsign.Plugins
             InVehicle = s.InVehicle,
             MinSuspects = s.MinSuspects,
             MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
+            Intensity = s.Intensity,
         }));
 
         public IDisposable AddLocation(CalloutLocation l) => Own(_parts.Locations.Add(new LocationPart(

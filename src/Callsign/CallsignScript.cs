@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using GTA;
 using Callsign.Core.Arrest;
 using Callsign.Core.Callouts;
+using Callsign.Core.Director;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
@@ -66,7 +67,9 @@ namespace Callsign
             var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameVehicleFactory(), blips,
                 world, notifier, clock, random, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
                 interaction, custody);
-            var callouts = new CalloutService(new IncidentGenerator(parts, random, s => settings.Current.Callouts.IsEnabled(s.Id)), duty, bus, clock, random, sceneServices);
+            var director = new PacingDirector(bus, clock);
+            var callouts = new CalloutService(new IncidentGenerator(parts, random, s => settings.Current.Callouts.IsEnabled(s.Id), director),
+                duty, bus, clock, random, sceneServices, director);
             var trafficStops = new TrafficStopService(duty, bus, new GameTraffic(), sceneServices);
             // New settings: add items to a page, or a page here.
             var settingsMenu = new SettingsMenu(new ISettingsPage[] { new CalloutsSettingsPage(parts, settings) });
@@ -74,7 +77,7 @@ namespace Callsign
             // --- modules, in tick order (dev bridge first so its keys count this tick; settings before
             //     the gameplay modules so an open settings menu keeps its keys; plugins last) ---
             if (System.IO.Directory.Exists(paths.Dev))
-                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, trafficStops, settingsMenu, _scopes, _input, _log));
+                _modules.Add(new DevBridgeModule(paths.Dev, duty, callouts, director, trafficStops, settingsMenu, _scopes, _input, _log));
             _modules.Add(new SettingsModule(settingsMenu, menuView, _input,
                 () => (callouts.Scene ?? trafficStops.Scene)?.FocusInteraction?.MenuOpen == true));
             _modules.Add(new DutyModule(duty, bus, _input));

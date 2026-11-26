@@ -2,7 +2,9 @@
 
 Every call is assembled when dispatch offers it: the situation below, plus a location, a suspect
 and how each suspect will react (cooperate, run or fight). The same call can play out very
-differently twice. Plugins can add their own (see the [plugin guide](PLUGINS.md)).
+differently twice. Dispatch paces the shift: after a big call the next one is calmer and comes a
+little later, a long quiet spell makes something bigger more likely, and recent calls, places and
+suspects are less likely to come straight back. Plugins can add their own (see the [plugin guide](PLUGINS.md)).
 
 ## On foot
 

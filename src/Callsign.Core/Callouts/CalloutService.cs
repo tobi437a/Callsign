@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Callsign.Core.Director;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Events;
@@ -25,14 +26,16 @@ namespace Callsign.Core.Callouts
         readonly IClock _clock;
         readonly IRandom _random;
         readonly CalloutSceneServices _services;
+        readonly IDispatchDirector _director;
         long _nextOfferAt;
         long _offerExpiresAt;
         bool _heldWhileBusy;
         CalloutScene? _scene;
 
         public CalloutService(IncidentGenerator generator, DutyService duty, IEventBus bus, IClock clock,
-            IRandom random, CalloutSceneServices services)
+            IRandom random, CalloutSceneServices services, IDispatchDirector? director = null)
         {
+            _director = director ?? NoDirector.Instance;
             _generator = generator;
             _duty = duty;
             _bus = bus;
@@ -69,7 +72,7 @@ namespace Callsign.Core.Callouts
                     else if (_heldWhileBusy)
                     {
                         _heldWhileBusy = false;
-                        Schedule(Settings.NextOfferMinMs, Settings.NextOfferMaxMs);
+                        ScheduleNext();
                     }
                     else if (_clock.NowMs >= _nextOfferAt) TryOffer();
                     break;
@@ -196,12 +199,15 @@ namespace Callsign.Core.Callouts
             Incident = null;
             Current = Phase.Waiting;
             _duty.End(Activity);
-            if (reason == CalloutEndReason.Declined || reason == CalloutEndReason.OfferExpired)
-                Schedule(Settings.RetryMs, Settings.RetryMs * 2);
-            else
-                Schedule(Settings.NextOfferMinMs, Settings.NextOfferMaxMs);
+            bool offerOnly = reason == CalloutEndReason.Declined || reason == CalloutEndReason.OfferExpired;
+            if (offerOnly) Schedule(Settings.RetryMs, Settings.RetryMs * 2);
             _bus.Publish(new CalloutEnded(incident, reason));
+            if (!offerOnly) ScheduleNext();   // after the event, so the director's tension already counts this call
         }
+
+        /// <summary>The gap after a call or a stop; longer while the shift has been intense.</summary>
+        void ScheduleNext() => Schedule((long)(Settings.NextOfferMinMs * _director.GapScale),
+            (long)(Settings.NextOfferMaxMs * _director.GapScale));
 
         void Schedule(long minMs, long maxMs)
         {
