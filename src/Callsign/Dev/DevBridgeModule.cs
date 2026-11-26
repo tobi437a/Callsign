@@ -30,7 +30,7 @@ namespace Callsign.Dev
     {
         public const string Help =
             "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
-            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
+            + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | damage | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
@@ -309,6 +309,12 @@ namespace Callsign.Dev
                     Vehicle v = player.CurrentVehicle ?? throw new InvalidOperationException("not in a vehicle");
                     v.IsSirenActive = arg(1) == "on";
                     return v.IsSirenActive ? "lights on" : "lights off";
+                case "damage":   // wreck the player's vehicle a bit (smoking engine, dented body, a flat tyre)
+                    Vehicle wreck = player.CurrentVehicle ?? throw new InvalidOperationException("not in a vehicle");
+                    wreck.EngineHealth = 250;
+                    wreck.BodyHealth = 300;
+                    wreck.Wheels[VehicleWheelBoneId.WheelLeftFront].Burst();
+                    return "engine=" + wreck.EngineHealth.ToString("0");
                 case "god":
                     player.IsInvincible = arg(1) == "on";
                     return player.IsInvincible ? "invincible" : "mortal";
@@ -325,7 +331,7 @@ namespace Callsign.Dev
             Vehicle? v = p.CurrentVehicle;
             return "duty=" + (_duty.OnDuty ? "on" : "off")
                 + " player=" + Fmt(p.Position) + (p.IsDead ? " DEAD" : "")
-                + (v != null ? " in=" + v.DisplayName + (v.IsSirenActive ? "+lights" : "") + " " + v.Speed.ToString("0") + "m/s" : " onfoot")
+                + (v != null ? " in=" + v.DisplayName + (v.IsSirenActive ? "+lights" : "") + " " + v.Speed.ToString("0") + "m/s engine=" + v.EngineHealth.ToString("0") : " onfoot")
                 + " scopes=" + _scopes.OpenCount
                 + " busy=" + (_duty.Activity ?? "no")
                 + " callout=" + _callouts.Describe()

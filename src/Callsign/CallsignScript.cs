@@ -72,7 +72,7 @@ namespace Callsign
                 duty, bus, clock, random, sceneServices, director);
             var trafficStops = new TrafficStopService(duty, bus, new GameTraffic(), sceneServices);
             // New settings: add items to a page, or a page here.
-            var settingsMenu = new SettingsMenu(new ISettingsPage[] { new CalloutsSettingsPage(parts, settings) });
+            var settingsMenu = new SettingsMenu(new ISettingsPage[] { new CalloutsSettingsPage(parts, settings), new VehicleSettingsPage(new GamePlayerVehicle(), notifier) });
 
             // --- modules, in tick order (dev bridge first so its keys count this tick; settings before
             //     the gameplay modules so an open settings menu keeps its keys; plugins last) ---

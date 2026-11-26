@@ -1,0 +1,20 @@
+# Settings menu (F6) > Vehicle > Repair vehicle: a damaged cruiser comes back to full engine health.
+mark scenario repair-vehicle
+car police3
+wait 500
+damage
+wait 300
+expect engine=250
+key F6
+wait 300
+pick 1
+wait 300
+expect settings=[Vehicle
+pick repair
+wait 500
+expect engine=1000
+key Back
+wait 300
+key Back
+wait 300
+expect settings=closed
