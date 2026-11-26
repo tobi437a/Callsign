@@ -29,7 +29,7 @@ namespace Callsign.Dev
     internal sealed class DevBridgeModule : IModule
     {
         public const string Help =
-            "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
+            "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId [complicationId|none]] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
             + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | damage | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
@@ -152,7 +152,7 @@ namespace Callsign.Dev
 
                 case "call":
                     if (_callouts.Current == CalloutService.Phase.OffDuty) throw new InvalidOperationException("off duty (or duty not ticked yet)");
-                    if (!_callouts.RequestNow(a.Length > 1 ? arg(1) : null)) throw new InvalidOperationException("no call offered (" + _callouts.Current + ")");
+                    if (!_callouts.RequestNow(a.Length > 1 ? arg(1) : null, a.Length > 2 ? arg(2) : null)) throw new InvalidOperationException("no call offered (" + _callouts.Current + ")");
                     return _callouts.Describe();
                 case "accept": return Check(_callouts.Accept(), "nothing offered");
                 case "decline": return Check(_callouts.Decline(), "nothing offered");

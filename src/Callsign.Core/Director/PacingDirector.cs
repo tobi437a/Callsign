@@ -29,6 +29,17 @@ namespace Callsign.Core.Director
         public double LocationRepeat { get; set; } = 0.9;
         public double SuspectRepeat { get; set; } = 0.6;
         public double OutcomeRepeat { get; set; } = 0.35;
+        public double ComplicationRepeat { get; set; } = 0.8;
+
+        /// <summary>
+        /// Complication chance scale at target intensity 0 (right after chaos) and 1 (a long quiet spell):
+        /// fewer twists on a tense shift, more when it has been quiet.
+        /// </summary>
+        public double ComplicationScaleMin { get; set; } = 0.4;
+        public double ComplicationScaleMax { get; set; } = 1.6;
+
+        /// <summary>Extra tension a call with a complication adds.</summary>
+        public double ComplicationLoad { get; set; } = 0.15;
     }
 
     /// <summary>
@@ -53,6 +64,7 @@ namespace Callsign.Core.Director
             Locations = new CallMemory(_settings.MemorySize, _settings.LocationRepeat);
             Suspects = new CallMemory(_settings.MemorySize, _settings.SuspectRepeat);
             Outcomes = new CallMemory(_settings.MemorySize, _settings.OutcomeRepeat);
+            Complications = new CallMemory(_settings.MemorySize, _settings.ComplicationRepeat);
             _tensionAt = _lastActivityAt = clock.NowMs;
 
             bus.Subscribe<CalloutOffered>(e => Remember(e.Incident));
@@ -66,6 +78,7 @@ namespace Callsign.Core.Director
         public CallMemory Locations { get; }
         public CallMemory Suspects { get; }
         public CallMemory Outcomes { get; }
+        public CallMemory Complications { get; }
 
         /// <summary>0..1: how intense the shift has been lately.</summary>
         public double Tension
@@ -99,9 +112,14 @@ namespace Callsign.Core.Director
         public double Factor(LocationPart location) => Locations.Factor(LocationKey(location));
         public double Factor(SuspectPart suspect) => Suspects.Factor(suspect.Id);
         public double Factor(OutcomePart outcome) => Outcomes.Factor(outcome.Id);
+        public double Factor(ComplicationPart complication) => Complications.Factor(complication.Id);
+
+        public double ComplicationScale =>
+            _settings.ComplicationScaleMin + (_settings.ComplicationScaleMax - _settings.ComplicationScaleMin) * Target;
 
         /// <summary>One line for dev tools.</summary>
         public string Describe() => "tension=" + F(Tension) + " target=" + F(Target) + " gap=x" + F(GapScale)
+            + " twists=x" + F(ComplicationScale)
             + " recent=" + (Situations.Recent.Count == 0 ? "-" : string.Join(",", Situations.Recent));
 
         void Remember(Incident incident)
@@ -110,6 +128,7 @@ namespace Callsign.Core.Director
             Locations.Remember(LocationKey(incident.Location));
             Suspects.Remember(incident.Suspect.Id);
             Outcomes.Remember(incident.Outcome.Id);
+            if (incident.Twist != null) Complications.Remember(incident.Twist.Part.Id);
         }
 
         void Active() => _lastActivityAt = _clock.NowMs;
@@ -122,7 +141,7 @@ namespace Callsign.Core.Director
         }
 
         /// <summary>How much a finished call adds: its intensity, or more if it turned into a chase or a fight.</summary>
-        static double Load(CalloutEnded e)
+        double Load(CalloutEnded e)
         {
             switch (e.Reason)
             {
@@ -134,6 +153,13 @@ namespace Callsign.Core.Director
             double load = e.Incident.Situation.Intensity;
             if (e.Incident.Suspects.Any(s => s.Outcome.Behaviour == SuspectBehaviour.Flee)) load = Math.Max(load, 0.6);
             if (e.Incident.Suspects.Any(s => s.Outcome.Behaviour == SuspectBehaviour.Fight)) load = Math.Max(load, 0.8);
+            Twist? twist = e.Incident.Twist;
+            if (twist != null)
+            {
+                if (twist.Part.Behaviour == SuspectBehaviour.Fight || twist.Accomplices.Any(a => a.Outcome.Behaviour == SuspectBehaviour.Fight))
+                    load = Math.Max(load, 0.8);
+                load += _settings.ComplicationLoad;
+            }
             if (e.Reason == CalloutEndReason.SuspectEscaped || e.Reason == CalloutEndReason.SuspectDied) load += 0.1;
             if (e.Reason == CalloutEndReason.Cancelled) load *= 0.5;   // usually called off before it got going
             return Math.Min(1, load);

@@ -42,5 +42,6 @@ namespace Callsign.Core.Callouts
         public PartRegistry<LocationPart> Locations { get; } = new PartRegistry<LocationPart>();
         public PartRegistry<SuspectPart> Suspects { get; } = new PartRegistry<SuspectPart>();
         public PartRegistry<OutcomePart> Outcomes { get; } = new PartRegistry<OutcomePart>();
+        public PartRegistry<ComplicationPart> Complications { get; } = new PartRegistry<ComplicationPart>();
     }
 }

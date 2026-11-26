@@ -41,6 +41,9 @@ namespace Callsign.Core.Callouts
         public float GetOutSpeed { get; set; } = 3;
         public long StopTimeoutMs { get; set; } = 8_000;
 
+        /// <summary>Accomplices (a twist) show up about this far from the suspect the player is dealing with.</summary>
+        public float AccompliceDistance { get; set; } = 15;
+
         /// <summary>How fleeing drivers wear down and give up.</summary>
         public PursuitSettings Pursuit { get; set; } = new PursuitSettings();
     }

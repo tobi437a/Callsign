@@ -89,10 +89,11 @@ All callbacks run on the game's script thread.
 | `ICallsignApi.Duty.DutyChanged` | Raised after the player goes on or off duty. |
 | `ICallsignApi.Log` | `Info` / `Warn` / `Error` into `Callsign.log`. |
 | `ICallsignApi.Callouts.AddSituation / AddLocation / AddSuspect / AddOutcome` | Add callout parts (since 0.2). |
+| `ICallsignApi.Callouts.AddComplication` | Add a mid-call twist (since 0.6). |
 | `ICallsignApi.Callouts.Current` | The call currently offered or running, or null. |
 | `ICallsignApi.Callouts.CalloutOffered / CalloutAccepted / CalloutEnded` | Follow calls as they happen. |
 
-Coming as the features are built: fully custom callouts, more part kinds (twists), suspect
+Coming as the features are built: fully custom callouts, suspect
 behaviours, interaction-menu options, more events (pursuits, arrests, shifts, promotions), and
 services for spawning, backup and the career.
 
@@ -124,6 +125,22 @@ api.Callouts.AddLocation(new CalloutLocation(
 - Pacing (since 0.5): set `Intensity` (0 to 1, default 0.3) on the situation. Dispatch sends calm
   calls after intense ones and bigger ones after a quiet spell, and recently offered parts are less
   likely to come up again, so you don't need to tune weights against repeats.
+- Twists (since 0.6): a `CalloutComplication` is something that changes the call partway through,
+  kept secret from dispatch. `Accomplice` brings 1 to 3 more people involved (they react as you set,
+  or roll like the suspects); `Panic` makes a cooperating suspect run or attack (a driver at the wheel
+  drives off). Triggers: `Arrival`, `Delay` (seconds after arrival), `Stop` (the player stops someone,
+  or the pulled-over car stops), `Arrest`. A situation only gets twists whose tags it lists in
+  `ComplicationTags`, with `ComplicationChance` (default 0.35). Built-in twist tags: `foot`, `store`,
+  `group`, `robbery`, `vehicle`, `gang`.
+
+```csharp
+api.Callouts.AddComplication(new CalloutComplication(
+    "myplugin-brother", ComplicationKind.Accomplice, ComplicationTrigger.Arrest,
+    "~r~The suspect's brother is running at you!~s~", tags: new[] { "group" })
+{
+    Reaction = SuspectReaction.Fight,
+});
+```
 - Your parts are removed when your plugin unloads.
 
 ## Compatibility

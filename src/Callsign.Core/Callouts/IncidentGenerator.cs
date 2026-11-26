@@ -10,15 +10,21 @@ namespace Callsign.Core.Callouts
     /// <summary>One suspect of an incident: which ped model, and how they will react.</summary>
     public sealed record SuspectRoll(string Model, OutcomePart Outcome);
 
+    /// <summary>The complication rolled for an incident.</summary>
+    /// <param name="Accomplices">For <see cref="ComplicationKind.Accomplice"/>: who shows up; empty otherwise.</param>
+    public sealed record Twist(ComplicationPart Part, IReadOnlyList<SuspectRoll> Accomplices);
+
     /// <summary>One concrete incident: a part of each kind, plus the rolls made for it.</summary>
     /// <param name="Suspects">At least one. In a vehicle, the first one drives.</param>
     /// <param name="VehicleModel">The suspects' vehicle, or null when they are on foot.</param>
+    /// <param name="Twist">What goes wrong partway through, or null. Dispatch doesn't know.</param>
     public sealed record Incident(
         SituationPart Situation,
         LocationPart Location,
         SuspectPart Suspect,
         IReadOnlyList<SuspectRoll> Suspects,
-        string? VehicleModel = null)
+        string? VehicleModel = null,
+        Twist? Twist = null)
     {
         public string Title => Situation.Title;
 
@@ -66,9 +72,10 @@ namespace Callsign.Core.Callouts
         /// <param name="maxDistance">Locations further than this are skipped.</param>
         /// <param name="extraLocations">One-off locations for this draw only (e.g. a street near the player).</param>
         /// <param name="situationId">Only this situation (dev tools; even if switched off), or null for any enabled one.</param>
+        /// <param name="complicationId">Dev tools: this complication for sure (an unknown id = none), or null to roll.</param>
         /// <returns>Null when no combination fits.</returns>
         public Incident? Generate(Position player, float minDistance, float maxDistance,
-            IEnumerable<LocationPart>? extraLocations = null, string? situationId = null)
+            IEnumerable<LocationPart>? extraLocations = null, string? situationId = null, string? complicationId = null)
         {
             var locations = _parts.Locations.All
                 .Concat(extraLocations ?? Enumerable.Empty<LocationPart>())
@@ -99,7 +106,42 @@ namespace Callsign.Core.Callouts
                 rolls.Add(new SuspectRoll(PickModel(suspect), other));
             }
             string? vehicle = suspect.InVehicle ? suspect.Vehicles[_random.Next(suspect.Vehicles.Count)] : null;
-            return new Incident(situation, location, suspect, rolls, vehicle);
+            return new Incident(situation, location, suspect, rolls, vehicle, RollTwist(situation, suspect, outcomes, complicationId));
+        }
+
+        Twist? RollTwist(SituationPart situation, SuspectPart suspect, IReadOnlyList<OutcomePart> outcomes, string? forcedId)
+        {
+            ComplicationPart complication;
+            if (forcedId != null)
+            {
+                ComplicationPart? forced = _parts.Complications.All
+                    .FirstOrDefault(c => string.Equals(c.Id, forcedId, StringComparison.OrdinalIgnoreCase));
+                if (forced == null) return null;
+                complication = forced;
+            }
+            else
+            {
+                var fitting = _parts.Complications.All.Where(situation.Fits).ToList();
+                if (fitting.Count == 0) return null;
+                double chance = Math.Min(1, situation.ComplicationChance * _director.ComplicationScale);
+                if (chance <= 0 || _random.NextDouble() >= chance) return null;
+                if (!Weighted.TryPick(fitting, c => c.Weight * _director.Factor(c), _random, out complication)) return null;
+            }
+
+            var accomplices = new List<SuspectRoll>();
+            if (complication.Kind == ComplicationKind.Accomplice)
+            {
+                IReadOnlyList<string> models = complication.Models.Count > 0 ? complication.Models : suspect.Models;
+                for (int i = 0; i < complication.Count; i++)
+                {
+                    OutcomePart outcome = complication.Behaviour is SuspectBehaviour fixedBehaviour
+                        ? new OutcomePart(complication.Id, fixedBehaviour, Array.Empty<string>())
+                        : Weighted.TryPick(outcomes, o => o.Weight, _random, out OutcomePart rolled) ? rolled
+                        : new OutcomePart(complication.Id, SuspectBehaviour.Comply, Array.Empty<string>());
+                    accomplices.Add(new SuspectRoll(models[_random.Next(models.Count)], outcome));
+                }
+            }
+            return new Twist(complication, accomplices);
         }
 
         string PickModel(SuspectPart suspect) => suspect.Models[_random.Next(suspect.Models.Count)];

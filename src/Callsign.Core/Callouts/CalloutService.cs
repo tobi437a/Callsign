@@ -95,7 +95,8 @@ namespace Callsign.Core.Callouts
         /// call offered or running. False if it couldn't (including when no incident fits here).
         /// </summary>
         /// <param name="situationId">Only this situation (dev tools), or null for any.</param>
-        public bool RequestNow(string? situationId = null)
+        /// <param name="complicationId">Dev tools: this complication (an unknown id = none), or null to roll.</param>
+        public bool RequestNow(string? situationId = null, string? complicationId = null)
         {
             if (!_duty.OnDuty || Current == Phase.Offered || Current == Phase.Active) return false;
             if (_duty.Busy)
@@ -103,7 +104,7 @@ namespace Callsign.Core.Callouts
                 _services.Notifier.Notify("~c~Dispatch:~s~ finish your " + _duty.Activity + " first.");
                 return false;
             }
-            TryOffer(situationId);
+            TryOffer(situationId, complicationId);
             if (Current == Phase.Offered) return true;
             _services.Notifier.Notify("~c~Dispatch:~s~ no calls in your area right now.");
             return false;
@@ -161,10 +162,11 @@ namespace Callsign.Core.Callouts
             Current + (Incident != null ? " " + Incident.Situation.Id + "@" + Incident.Location.Id : "")
             + (_scene != null ? " | " + _scene.Describe() : "");
 
-        void TryOffer(string? situationId = null)
+        void TryOffer(string? situationId = null, string? complicationId = null)
         {
             Position player = _services.World.PlayerPosition;
-            Incident? incident = _generator.Generate(player, Settings.MinDistance, Settings.MaxDistance, NearbyStreets(player), situationId);
+            Incident? incident = _generator.Generate(player, Settings.MinDistance, Settings.MaxDistance, NearbyStreets(player),
+                situationId, complicationId);
             if (incident == null)
             {
                 _nextOfferAt = _clock.NowMs + Settings.RetryMs;
@@ -177,7 +179,8 @@ namespace Callsign.Core.Callouts
             _services.Notifier.Notify("~b~Dispatch:~s~ ~y~" + incident.Title + "~s~~n~" + incident.DispatchMessage);
             _services.Log.Info("Offered " + incident.Situation.Id + " @ " + incident.Location.Id + ": " + incident.Suspect.Id
                 + (incident.VehicleModel != null ? " in " + incident.VehicleModel : "")
-                + ", " + string.Join("/", incident.Suspects.Select(x => x.Outcome.Id)));
+                + ", " + string.Join("/", incident.Suspects.Select(x => x.Outcome.Id))
+                + (incident.Twist != null ? ", twist " + incident.Twist.Part.Id : ""));
             _bus.Publish(new CalloutOffered(incident));
         }
 

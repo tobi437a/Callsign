@@ -31,6 +31,10 @@ namespace Callsign.API.Callouts
         /// <exception cref="ArgumentException">The id is empty or already taken.</exception>
         IDisposable AddOutcome(CalloutOutcome outcome);
 
+        /// <summary>Adds a complication (a mid-call twist). Dispose the result to remove it early. Since API 0.6.</summary>
+        /// <exception cref="ArgumentException">The id is empty or already taken, or a value is out of range.</exception>
+        IDisposable AddComplication(CalloutComplication complication);
+
         /// <summary>The call currently offered or running, or null.</summary>
         CalloutInfo? Current { get; }
 

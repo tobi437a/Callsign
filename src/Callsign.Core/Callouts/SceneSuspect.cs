@@ -101,6 +101,28 @@ namespace Callsign.Core.Callouts
             Surrender(announce: false);
         }
 
+        /// <summary>Cooperating so far, so a twist can still make them break.</summary>
+        public bool CanPanic => Current == State.Calm;
+
+        /// <summary>
+        /// A twist: the calm suspect suddenly runs or attacks. Returns true if they are at the wheel and
+        /// drive off instead (the scene starts the pursuit).
+        /// </summary>
+        public bool Panic(SuspectBehaviour behaviour)
+        {
+            if (!CanPanic || behaviour == SuspectBehaviour.Comply) return false;
+            Interaction.Interrupt();
+            Behaviour = behaviour;
+            if (behaviour == SuspectBehaviour.Flee && IsDriver && Ped.InVehicle)
+            {
+                Current = State.Seated;
+                return true;
+            }
+            if (behaviour == SuspectBehaviour.Fight) Fight();
+            else Run();
+            return false;
+        }
+
         /// <summary>The vehicle drives off with them in it: the scene handles them again.</summary>
         public void Reseat()
         {

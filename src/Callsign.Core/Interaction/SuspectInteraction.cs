@@ -391,6 +391,9 @@ namespace Callsign.Core.Interaction
             return InteractionOutcome.Fled;
         }
 
+        /// <summary>Something outside the conversation made them break off (a twist): the menu closes, no new escape rolls.</summary>
+        public void Interrupt() => Close(InteractionOutcome.Fled);
+
         InteractionOutcome Close(InteractionOutcome outcome)
         {
             _menuOpen = false;

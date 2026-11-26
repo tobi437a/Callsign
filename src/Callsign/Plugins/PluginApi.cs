@@ -62,6 +62,8 @@ namespace Callsign.Plugins
             MinSuspects = s.MinSuspects,
             MaxSuspects = s.MaxSuspects == 0 ? s.MinSuspects : s.MaxSuspects,
             Intensity = s.Intensity,
+            ComplicationTags = s.ComplicationTags,
+            ComplicationChance = s.ComplicationChance,
         }));
 
         public IDisposable AddLocation(CalloutLocation l) => Own(_parts.Locations.Add(new LocationPart(
@@ -75,6 +77,16 @@ namespace Callsign.Plugins
 
         public IDisposable AddOutcome(CalloutOutcome o) => Own(_parts.Outcomes.Add(new OutcomePart(
             o.Id, ToCore(o.Reaction), o.Tags, o.Weight)));
+
+        public IDisposable AddComplication(CalloutComplication c) => Own(_parts.Complications.Add(new ComplicationPart(
+            c.Id, ToCore(c.Kind), ToCore(c.Trigger), string.IsNullOrWhiteSpace(c.Message) ? null : c.Message, c.Tags, c.Weight)
+        {
+            DelaySeconds = c.DelaySeconds,
+            Behaviour = c.Reaction == null ? (SuspectBehaviour?)null : ToCore(c.Reaction.Value),
+            Count = c.Count,
+            Models = c.Models,
+            Weapon = string.IsNullOrWhiteSpace(c.Weapon) ? null : c.Weapon,
+        }));
 
         public CalloutInfo? Current => _callouts.Incident == null ? null : ToInfo(_callouts.Incident);
 
@@ -99,6 +111,28 @@ namespace Callsign.Plugins
                 case SuspectReaction.Flee: return SuspectBehaviour.Flee;
                 case SuspectReaction.Fight: return SuspectBehaviour.Fight;
                 default: throw new ArgumentException("Unknown suspect reaction " + reaction, nameof(reaction));
+            }
+        }
+
+        static Core.Callouts.ComplicationKind ToCore(API.Callouts.ComplicationKind kind)
+        {
+            switch (kind)
+            {
+                case API.Callouts.ComplicationKind.Accomplice: return Core.Callouts.ComplicationKind.Accomplice;
+                case API.Callouts.ComplicationKind.Panic: return Core.Callouts.ComplicationKind.Panic;
+                default: throw new ArgumentException("Unknown complication kind " + kind, nameof(kind));
+            }
+        }
+
+        static Core.Callouts.ComplicationTrigger ToCore(API.Callouts.ComplicationTrigger trigger)
+        {
+            switch (trigger)
+            {
+                case API.Callouts.ComplicationTrigger.Arrival: return Core.Callouts.ComplicationTrigger.Arrival;
+                case API.Callouts.ComplicationTrigger.Delay: return Core.Callouts.ComplicationTrigger.Delay;
+                case API.Callouts.ComplicationTrigger.Stop: return Core.Callouts.ComplicationTrigger.Stop;
+                case API.Callouts.ComplicationTrigger.Arrest: return Core.Callouts.ComplicationTrigger.Arrest;
+                default: throw new ArgumentException("Unknown complication trigger " + trigger, nameof(trigger));
             }
         }
 
