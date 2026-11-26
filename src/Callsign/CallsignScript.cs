@@ -64,7 +64,7 @@ namespace Callsign
             var custody = new CustodyServices(world, blips, notifier, clock, stations, new CustodySettings());
             var menuView = new GameMenuView();
             var interaction = new InteractionServices(world, notifier, menuView, clock, random,
-                new Dialogue(suspectContent, random), new InteractionSettings());
+                new Dialogue(suspectContent, random), new InteractionSettings()) { Controls = new GameControls() };
             var sceneServices = new CalloutSceneServices(_scopes, new GamePedFactory(), new GameVehicleFactory(), blips,
                 world, notifier, clock, random, _log, new CalloutSettings(), new SuspectProfileGenerator(suspectContent, random),
                 interaction, custody);

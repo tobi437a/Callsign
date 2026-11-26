@@ -26,8 +26,15 @@ sealed class FakePedestrians : IPedestrians
     }
 }
 
+sealed class FakeControls : IGameControls
+{
+    public int Blocked;
+    public void BlockInteractKey() => Blocked++;
+}
+
 public class PedStopServiceTests
 {
+    readonly FakeControls _controls = new();
     static readonly Position Street = new(100, 0, 0);
 
     readonly FakeClock _clock = new();
@@ -51,7 +58,7 @@ public class PedStopServiceTests
         // 0.5 for every roll: no hidden traits, a clean record, and only sure reactions happen.
         var random = new FixedRandom(0.5);
         var content = new SuspectContent();
-        var interaction = new InteractionServices(_world, _notifier, _menu, _clock, random, new Dialogue(content, random), new InteractionSettings());
+        var interaction = new InteractionServices(_world, _notifier, _menu, _clock, random, new Dialogue(content, random), new InteractionSettings()) { Controls = _controls };
         var custody = new CustodyServices(_world, new FakeBlips(), _notifier, _clock, [new PoliceStation("hq", "HQ", new Position(0, 5000, 0))], new CustodySettings());
         var noTraits = new TraitChances { Warrant = 0, FalseNameOtherwise = 0, NoId = 0, Intoxicated = 0, HadADrink = 0,
             OnDrugs = 0, CarryingDrugs = 0, ConcealedWeapon = 0, NervousOtherwise = 0 };
@@ -87,6 +94,21 @@ public class PedStopServiceTests
         Tick();
         Assert.Equal(PedStopService.StopHelp, _notifier.HelpShown);
         Assert.False(_stops.Active);
+    }
+
+    [Fact]
+    public void TheGameDoesntGetEWhileItStopsSomeone()
+    {
+        _duty.SetOnDuty(true);
+        Tick();
+        Assert.Equal(0, _controls.Blocked);   // nobody near: E is the game's (taxis, doors, ...)
+
+        Patrol();
+        Tick();
+        Assert.Equal(1, _controls.Blocked);
+        Tick(stop: true);
+        Tick();   // stopped, standing right there: E opens our menu
+        Assert.True(_controls.Blocked >= 3);
     }
 
     [Fact]

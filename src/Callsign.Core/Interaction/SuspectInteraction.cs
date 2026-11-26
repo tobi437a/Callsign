@@ -44,7 +44,11 @@ namespace Callsign.Core.Interaction
         IClock Clock,
         IRandom Random,
         Dialogue Dialogue,
-        InteractionSettings Settings);
+        InteractionSettings Settings)
+    {
+        /// <summary>The game's own key uses, so holding E near a suspect doesn't hail a taxi.</summary>
+        public IGameControls Controls { get; init; } = NoGameControls.Instance;
+    }
 
     /// <summary>What the player pressed this frame.</summary>
     /// <param name="StopHeld">The interact key has just been held long enough to stop someone.</param>
@@ -146,6 +150,8 @@ namespace Callsign.Core.Interaction
             IWorld world = _s.World;
             float distance = world.PlayerPosition.DistanceTo(_suspect.Position);
             bool onFoot = world.PlayerOnFoot;
+            // Close enough that E means this suspect (stop, talk, menu): the game's own E waits.
+            if (onFoot && distance <= _s.Settings.StopDistance) _s.Controls.BlockInteractKey();
 
             if (!Stopped)
             {

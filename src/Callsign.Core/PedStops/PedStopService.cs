@@ -57,8 +57,10 @@ namespace Callsign.Core.PedStops
             if (_scene == null)
             {
                 if (!_duty.OnDuty || _duty.Busy || !_s.World.PlayerOnFoot) return;
+                if (!_pedestrians.AnyoneToStop(_settings.MaxTargetDistance)) return;
+                _s.Interaction.Controls.BlockInteractKey();   // holding E stops them, it mustn't also hail a taxi
                 if (input.StopHeld) TryStart();
-                else if (_pedestrians.AnyoneToStop(_settings.MaxTargetDistance)) _s.Notifier.Help(StopHelp);
+                else _s.Notifier.Help(StopHelp);
                 return;
             }
 
