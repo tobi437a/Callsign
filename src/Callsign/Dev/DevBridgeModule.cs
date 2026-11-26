@@ -10,6 +10,7 @@ using Callsign.Core.Callouts;
 using Callsign.Core.Duty;
 using Callsign.Core.Entities;
 using Callsign.Core.Ports;
+using Callsign.Core.Settings;
 using Callsign.Core.TrafficStops;
 using Callsign.Engine;
 using Callsign.Modules;
@@ -27,13 +28,14 @@ namespace Callsign.Dev
     internal sealed class DevBridgeModule : IModule
     {
         public const string Help =
-            "ping | state | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
+            "ping | state | (settings: key F6, pick <id>) | expect <text> | expect! <text> | duty on|off | call [situationId] | accept | decline | cancel | key <Key> [holdMs] | wait <ms> "
             + "| traffic [model] | stop | onfoot | pick <menuItemId> | kerb | cam [off] | tp <x> <y> <z> | tp scene [metres] | car [model] | lights on|off | god on|off | hour <0-23> | mark <text>";
 
         readonly string _dir;
         readonly DutyService _duty;
         readonly CalloutService _callouts;
         readonly TrafficStopService _stops;
+        readonly SettingsMenu _settings;
         readonly EntityScopes _scopes;
         readonly KeyInput _input;
         readonly ILog _log;
@@ -44,8 +46,9 @@ namespace Callsign.Dev
         readonly List<(Vector3 At, System.Drawing.Color Color)> _markers = new List<(Vector3, System.Drawing.Color)>();
         int _nextPoll;
 
-        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, EntityScopes scopes, KeyInput input, ILog log)
+        public DevBridgeModule(string dir, DutyService duty, CalloutService callouts, TrafficStopService stops, SettingsMenu settings, EntityScopes scopes, KeyInput input, ILog log)
         {
+            _settings = settings;
             _dir = dir;
             _duty = duty;
             _callouts = callouts;
@@ -171,10 +174,11 @@ namespace Callsign.Dev
                     driver.MarkAsNoLongerNeeded();   // ambient, like real traffic
                     traffic.MarkAsNoLongerNeeded();
                     return traffic.LocalizedName + " " + traffic.Mods.LicensePlate;
-                case "pick":   // choose a menu item by id, by pressing the keys a player would (one per tick)
+                case "pick":   // choose a menu item by id (settings menu first), by pressing the keys a player would (one per tick)
                     var interaction = (_callouts.Scene ?? _stops.Scene)?.FocusInteraction;
-                    if (interaction == null || !interaction.MenuOpen) throw new InvalidOperationException("no menu open");
-                    var menu = interaction.Menu;
+                    var menu = _settings.IsOpen ? _settings.Menu
+                        : interaction != null && interaction.MenuOpen ? interaction.Menu
+                        : throw new InvalidOperationException("no menu open");
                     int target = menu.Items.ToList().FindIndex(i => i.Id == arg(1));
                     if (target < 0) throw new ArgumentException("no item '" + arg(1) + "' in: " + string.Join(",", menu.Items.Select(i => i.Id)));
                     int steps = (target - menu.SelectedIndex + menu.Items.Count) % menu.Items.Count;
@@ -322,7 +326,8 @@ namespace Callsign.Dev
                 + " scopes=" + _scopes.OpenCount
                 + " busy=" + (_duty.Activity ?? "no")
                 + " callout=" + _callouts.Describe()
-                + " stop=" + _stops.Describe();
+                + " stop=" + _stops.Describe()
+                + " settings=" + (_settings.IsOpen ? "[" + _settings.Menu.Title + ": " + string.Join(",", _settings.Menu.Items.Select(i => i.Id + (i.Value != null ? "=" + i.Value.Replace("~g~", "").Replace("~r~", "") : ""))) + "]" : "closed");
         }
 
         static string Check(bool ok, string why) => ok ? "" : throw new InvalidOperationException(why);

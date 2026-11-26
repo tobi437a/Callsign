@@ -14,6 +14,9 @@ namespace Callsign.Engine
         public string Data => Path.Combine(Home, "Data");
         public string LogFile => Path.Combine(Home, "Callsign.log");
 
+        /// <summary>The player's settings (not in Data\, which every update overwrites).</summary>
+        public string SettingsFile => Path.Combine(Home, "settings.xml");
+
         /// <summary>Dev tools' command folder. Only deploy.ps1 creates it; the dev bridge runs only if it exists.</summary>
         public string Dev => Path.Combine(Home, "Dev");
 

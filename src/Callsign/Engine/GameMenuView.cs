@@ -48,11 +48,14 @@ namespace Callsign.Engine
                 // Colour codes in labels would fight the selected row's dark text, so drop them there.
                 string label = selected ? StripColours(item.Label) : item.Label;
                 new TextElement(label, new PointF(X + Padding, y + 3), 0.35f, color, GTA.UI.Font.ChaletLondon).Draw();
+                if (item.Value != null)   // right-aligned: X is the text's right edge
+                    new TextElement(selected ? StripColours(item.Value) : item.Value, new PointF(X + Width - Padding, y + 3), 0.35f, color,
+                        GTA.UI.Font.ChaletLondon, Alignment.Right).Draw();
                 y += RowHeight;
             }
 
             new ContainerElement(new PointF(X, y), new SizeF(Width, RowHeight - 6), RowBack).Draw();
-            new TextElement("Arrows: move    Enter: choose    E / Backspace: close", new PointF(X + Padding, y + 3),
+            new TextElement(menu.Hint ?? "Arrows: move    Enter: choose    E / Backspace: close", new PointF(X + Padding, y + 3),
                 0.28f, DisabledText, GTA.UI.Font.ChaletLondon).Draw();
         }
 

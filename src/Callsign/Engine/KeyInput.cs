@@ -36,6 +36,16 @@ namespace Callsign.Engine
         public bool WasPressed(Keys key) => _pressed.Contains(key);
 
         /// <summary>
+        /// Takes <paramref name="key"/> away from the modules after this one, for this press: it no
+        /// longer counts as pressed this tick or as held until it is let go (an open menu owns its keys).
+        /// </summary>
+        public void Consume(Keys key)
+        {
+            _pressed.Remove(key);
+            if (_downSince.ContainsKey(key)) _holdReported[key] = -1;   // a frame that never comes: WasHeld stays false
+        }
+
+        /// <summary>
         /// True on the one tick where <paramref name="key"/> has been held for <paramref name="ms"/>
         /// (for every caller that tick, so modules don't steal it from each other).
         /// </summary>
