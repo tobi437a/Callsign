@@ -3,11 +3,11 @@
 #   game.ps1 cmd "duty on" "state"  run dev-bridge commands in order, print their results
 #   game.ps1 run <scenario>         run tools\scenarios\<scenario>.txt (one command per line, # comments);
 #                                   exits 1 if any command failed (e.g. an "expect" check)
-#   game.ps1 shot [file.png]        screenshot of the game (default: scratch\shot.png)
+#   game.ps1 shot [file.png]        screenshot of the game (brings it to the front for a moment)
 #   game.ps1 log [lines]            tail Callsign.log
 #   game.ps1 focus                  bring the game to the front
 #   game.ps1 key Escape             focus the game and tap a key (System.Windows.Forms.Keys name)
-# The game pauses when it loses focus (PauseOnFocusLoss), so reload and cmd focus it first.
+# Works in the background (no focus stealing) if the game keeps running unfocused; add -Focus otherwise.
 # Commands are read by Callsign's DevBridge, which only runs when <game>\Callsign\Dev\ exists
 # (deploy.ps1 creates it). See src\Callsign\Dev\DevBridgeModule.cs for the command list.
 
@@ -15,7 +15,10 @@ param(
     [Parameter(Mandatory = $true, Position = 0)][ValidateSet("reload", "cmd", "run", "shot", "log", "focus", "key")][string]$Action,
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest,
     [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto V",
-    [int]$TimeoutSec = 60
+    [int]$TimeoutSec = 60,
+    # Bring the game to the front for reload/cmd/shot. Not needed when the game keeps running in the
+    # background (GTA setting "Pause Game On Focus Loss" off); then nothing steals your focus.
+    [switch]$Focus
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,12 +53,26 @@ public static class GameWin {
 
     public static bool IsFront(IntPtr h) { return GetForegroundWindow() == h; }
 
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+
+    // A real key press; goes to whatever window is in front.
     public static void Tap(byte vk, bool extended) {
         byte scan = (byte)MapVirtualKey(vk, 0);
         uint ext = extended ? EXTENDED : 0;
         keybd_event(vk, scan, ext, UIntPtr.Zero);
         System.Threading.Thread.Sleep(80);
         keybd_event(vk, scan, ext | KEYUP, UIntPtr.Zero);
+    }
+
+    // A key press sent straight to the game's window: ScriptHookV reads window messages, so this
+    // reaches SHVDN (e.g. Insert) without the game having focus.
+    public static void Post(IntPtr h, byte vk, bool extended) {
+        uint scan = MapVirtualKey(vk, 0);
+        long down = 1 | ((long)scan << 16) | (extended ? (1L << 24) : 0);
+        long up = down | (1L << 30) | (1L << 31);
+        PostMessage(h, 0x0100, (IntPtr)vk, (IntPtr)down);   // WM_KEYDOWN
+        System.Threading.Thread.Sleep(80);
+        PostMessage(h, 0x0101, (IntPtr)vk, (IntPtr)up);     // WM_KEYUP
     }
 
     public static void Shot(IntPtr h, string path) {
@@ -107,8 +124,8 @@ switch ($Action) {
         $h = Get-GameWindow
         # FileLog starts a new file on load; its first line has the start time.
         $before = if (Test-Path $logFile) { Get-Content $logFile -TotalCount 1 } else { "" }
-        Focus-Game $h
-        [GameWin]::Tap(0x2D, $true)   # Insert
+        if ($Focus) { Focus-Game $h; [GameWin]::Tap(0x2D, $true) }   # Insert
+        else { [GameWin]::Post($h, 0x2D, $true) }
         # The plugin line is the last thing startup logs.
         Wait-Until { (Test-Path $logFile) -and (Get-Content $logFile -TotalCount 1) -ne $before -and
                      (Select-String -Path $logFile -Pattern "plugin\(s\) running" -Quiet) } "Callsign to load"
@@ -133,7 +150,7 @@ switch ($Action) {
         $tmp = "$commands.tmp"
         Set-Content -Path $tmp -Value $lines -Encoding UTF8
         Move-Item $tmp $commands -Force
-        Focus-Game (Get-GameWindow)
+        if ($Focus) { Focus-Game (Get-GameWindow) }
         $last = "$batch-$($Rest.Count - 1) "
         Wait-Until { (Test-Path $results) -and (Select-String -Path $results -SimpleMatch $last -Quiet) } "the commands to finish"
         $out = Get-Content $results
@@ -145,6 +162,7 @@ switch ($Action) {
     "shot" {
         $h = Get-GameWindow
         $path = if ($Rest) { $Rest[0] } else { Join-Path $env:TEMP "callsign-shot.png" }
+        # Always in front: a DirectX game window can't be captured from behind (PrintWindow gives a stale frame).
         Focus-Game $h
         [GameWin]::Shot($h, $path)
         $path

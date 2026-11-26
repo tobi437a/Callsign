@@ -72,6 +72,8 @@ sealed class FakePed(Position at) : IPed
     public void DriveAround() { if (Seat == 0 && InVehicle) Order = "drive"; }
     public void DriveAway() { if (Seat == 0 && InVehicle) Order = "driveaway"; }
     public void PullOver() { if (Seat == 0 && InVehicle) Order = "pullover"; }
+    public bool AtPullOverSpot { get; set; }
+    public void WaitInVehicle() { if (Seat == 0 && InVehicle) Order = "waiting"; }
     public void ShootFromVehicle() { if (InVehicle) Order = "driveby"; }
 
     public bool IsSubdued { get; set; }
@@ -122,6 +124,8 @@ sealed class FakeVehicle(Position at) : IVehicle
     public bool Exists { get; set; } = true;
     public Position Position { get; set; } = at;
     public float Speed { get; set; } = 15;
+    public string Plate { get; set; } = "12ABC345";
+    public string Model { get; set; } = "Futo";
     public bool IsWrecked { get; set; }
     public int BurstTyres { get; set; }
     public float EngineHealth { get; set; } = 1;
@@ -313,6 +317,36 @@ public class CalloutServiceTests
         _world.PlayerOnFoot = true;
         _world.PlayerInVehicle = false;
         _world.PlayerPosition = at with { X = at.X - away };
+    }
+
+    [Fact]
+    public void DispatchWaitsWhileTheOfficerIsBusy()
+    {
+        UseOutcome(SuspectBehaviour.Comply);
+        _duty.SetOnDuty(true);
+        Assert.True(_duty.TryBegin("traffic stop"));
+        Tick();
+        Advance(_settings.FirstOfferMaxMs);
+        Assert.Equal(CalloutService.Phase.Waiting, _service.Current);
+        Assert.False(_service.RequestNow());
+
+        _duty.End("traffic stop");
+        Tick();
+        Assert.Equal(CalloutService.Phase.Waiting, _service.Current);   // a breather first, as after a call
+        Advance(_settings.NextOfferMinMs - 1);
+        Assert.Equal(CalloutService.Phase.Waiting, _service.Current);
+        Advance(_settings.NextOfferMaxMs);
+        Assert.Equal(CalloutService.Phase.Offered, _service.Current);
+
+        // An offer that came in before the officer got busy can't be taken until they're free.
+        Assert.True(_duty.TryBegin("traffic stop"));
+        Assert.False(_service.Accept());
+        _duty.End("traffic stop");
+        Assert.True(_service.Accept());
+        Assert.Equal(CalloutService.Activity, _duty.Activity);
+
+        Assert.True(_service.Cancel());
+        Assert.False(_duty.Busy);
     }
 
     [Fact]
@@ -583,7 +617,13 @@ public class CalloutServiceTests
 
         car.Speed = 0;
         Tick();
-        Assert.True(driver.InVehicle);   // waits in the car for the officer
+        Assert.Equal("pullover", driver.Order);   // a moment's pause isn't a stop yet
+        Advance(_settings.PulledOverMs);
+        Assert.Equal("pullover", driver.Order);   // nor is waiting in traffic short of the kerb
+        driver.AtPullOverSpot = true;
+        Advance(_settings.PulledOverMs);
+        Assert.Equal("waiting", driver.Order);    // engine off, waits in the car for the officer
+        Assert.True(driver.InVehicle);
 
         PlayerOnFootAt(driver.Position, 2);
         OpenMenu(driver);

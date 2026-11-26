@@ -1,0 +1,35 @@
+# Pull over a car ahead (to the kerb), walk up and tap E (no hold: it is stopped already), run the plate, cite the driver: the stop ends and cleans up.
+# The driver's reaction is rolled from hidden traits, so now and then they run instead (rerun).
+mark scenario traffic-stop
+god on
+tp 430 -1426 29
+car police3
+duty on
+lights on
+wait 300
+traffic
+wait 1500
+key ShiftKey 700
+wait 1200
+expect busy=traffic stop
+wait 20000
+expect vehicle=Stopped
+onfoot
+wait 1500
+tp scene 2
+wait 500
+expect [stopped]
+key E
+wait 300
+expect [menu]
+pick id
+wait 500
+pick plate
+wait 5000
+state
+pick cite
+wait 1000
+expect busy=no
+expect stop=none
+expect scopes=0
+duty off

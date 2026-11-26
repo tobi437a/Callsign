@@ -28,10 +28,10 @@
   </Situation>
 
   <!-- Suspects in vehicles -->
-  <Suspect id="thief-futo"      description="Karin Futo"          vehicles="futo"      models="a_m_y_stwhi_01,a_m_y_stlat_01,a_m_y_stbla_01" tags="thief" />
-  <Suspect id="thief-sultan"    description="Karin Sultan"        vehicles="sultan"    models="a_m_y_stwhi_02,a_m_y_stbla_02,a_m_y_stlat_01" tags="thief" />
-  <Suspect id="thief-baller"    description="Gallivanter Baller"  vehicles="baller"    models="a_m_y_stwhi_01,g_m_y_famca_01"                 tags="thief" />
-  <Suspect id="thief-vigero"    description="Declasse Vigero"     vehicles="vigero"    models="a_m_y_methhead_01,a_m_y_stlat_01"             tags="thief" />
+  <Suspect id="thief-futo"      description="Karin Futo"          vehicles="futo"      models="a_m_y_stwhi_01,a_m_y_stlat_01,a_m_y_stbla_01" tags="thief,stolen" />
+  <Suspect id="thief-sultan"    description="Karin Sultan"        vehicles="sultan"    models="a_m_y_stwhi_02,a_m_y_stbla_02,a_m_y_stlat_01" tags="thief,stolen" />
+  <Suspect id="thief-baller"    description="Gallivanter Baller"  vehicles="baller"    models="a_m_y_stwhi_01,g_m_y_famca_01"                 tags="thief,stolen" />
+  <Suspect id="thief-vigero"    description="Declasse Vigero"     vehicles="vigero"    models="a_m_y_methhead_01,a_m_y_stlat_01"             tags="thief,stolen" />
   <Suspect id="dui-premier"     description="Declasse Premier"    vehicles="premier"   models="a_m_m_salton_01,a_m_m_genfat_01"              tags="dui,intoxicated" />
   <Suspect id="dui-bison"       description="Bravado Bison pickup" vehicles="bison"    models="a_m_m_hillbilly_01,a_m_m_salton_02"           tags="dui,intoxicated" />
   <Suspect id="dui-minivan"     description="Vapid Minivan"       vehicles="minivan"   models="a_m_y_hipster_01,a_f_y_hipster_01"            tags="dui,intoxicated" />

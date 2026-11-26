@@ -25,7 +25,10 @@ namespace Callsign.Core.Callouts
         CalloutSettings Settings,
         SuspectProfileGenerator Profiles,
         InteractionServices Interaction,
-        CustodyServices Custody);
+        CustodyServices Custody)
+    {
+        public VehicleRecordChances VehicleRecords { get; init; } = new VehicleRecordChances();
+    }
 
     /// <summary>What the player pressed this frame that a callout reacts to.</summary>
     /// <param name="StopHeld">The interact key has just been held long enough to stop someone.</param>
@@ -43,6 +46,8 @@ namespace Callsign.Core.Callouts
     /// Suspects in a vehicle drive around until the player catches up: a calm driver pulls over
     /// for the player's lights, anyone else floors it, and a pursuit ends with everyone bailing out.
     /// Everything it spawns lives in its own entity scope.
+    /// A scene can also start around a vehicle that is already on the road (a traffic stop):
+    /// see <see cref="AroundVehicle"/>.
     /// </summary>
     public sealed class CalloutScene
     {
@@ -64,7 +69,8 @@ namespace Callsign.Core.Callouts
 
         public const string PullOverHelp = "Turn on your emergency lights to pull the ~r~vehicle~s~ over.";
 
-        readonly Incident _incident;
+        /// <summary>Null for a scene around a vehicle already on the road.</summary>
+        readonly Incident? _incident;
         readonly CalloutSceneServices _s;
         readonly EntityScope _scope;
         readonly Position _spot;
@@ -103,6 +109,36 @@ namespace Callsign.Core.Callouts
             _areaBlip.ShowRoute = true;
         }
 
+        CalloutScene(IVehicle vehicle, EntityScope scope, CalloutSceneServices services)
+        {
+            _s = services;
+            _scope = scope;
+            _vehicle = vehicle;
+            _spot = vehicle.Position;
+        }
+
+        /// <summary>
+        /// A scene around a vehicle the player picked out of traffic, already taken into
+        /// <paramref name="scope"/> with its occupants (driver first). A calm driver pulls over;
+        /// anyone else flees and it becomes a pursuit.
+        /// </summary>
+        internal static CalloutScene AroundVehicle(IVehicle vehicle, IReadOnlyList<Occupant> occupants,
+            VehicleRecord record, EntityScope scope, CalloutSceneServices services)
+        {
+            if (occupants.Count == 0) throw new ArgumentException("needs at least a driver", nameof(occupants));
+            var scene = new CalloutScene(vehicle, scope, services);
+            for (int seat = 0; seat < occupants.Count; seat++)
+                scene._suspects.Add(new SceneSuspect(occupants[seat].Ped, occupants[seat].Profile, occupants[seat].Behaviour, seat, scope, services));
+            scene.Driver.Interaction.Vehicle = record;
+            scene.Current = Stage.Active;
+            if (scene.Driver.Behaviour == SuspectBehaviour.Comply) scene.PullOver();
+            else scene.StartPursuit();
+            return scene;
+        }
+
+        /// <summary>Someone in a vehicle taken over by <see cref="AroundVehicle"/>, and how they will react.</summary>
+        internal readonly record struct Occupant(IPed Ped, SuspectProfile Profile, SuspectBehaviour Behaviour);
+
         public Stage Current { get; private set; } = Stage.EnRoute;
 
         public VehicleStage Vehicle { get; private set; } = VehicleStage.None;
@@ -131,39 +167,44 @@ namespace Callsign.Core.Callouts
 
         CalloutEndReason? TrySpawn()
         {
+            Incident incident = _incident!;   // only callouts spawn
             try
             {
-                if (_incident.VehicleModel != null && _vehicle == null)
+                if (incident.VehicleModel != null && _vehicle == null)
                 {
-                    if (_s.Vehicles.TrySpawn(_scope, _incident.VehicleModel, _spot, _heading, out IVehicle? vehicle)) _vehicle = vehicle;
+                    if (_s.Vehicles.TrySpawn(_scope, incident.VehicleModel, _spot, _heading, out IVehicle? vehicle)) _vehicle = vehicle;
                     return null;
                 }
 
                 int i = _suspects.Count;
-                SuspectRoll roll = _incident.Suspects[i];
+                SuspectRoll roll = incident.Suspects[i];
                 Position at = _vehicle?.Position ?? new Position(_spot.X + i * 1.5f, _spot.Y, _spot.Z);
                 if (!_s.Peds.TrySpawn(_scope, roll.Model, at, _heading, out IPed? ped)) return null;
                 AddSuspect(ped!, roll, i);
             }
             catch (ArgumentException ex)
             {
-                _s.Log.Error("Callout '" + _incident.Situation.Id + "': could not spawn '" + _incident.Suspect.Id + "'", ex);
+                _s.Log.Error("Callout '" + incident.Situation.Id + "': could not spawn '" + incident.Suspect.Id + "'", ex);
                 return End(CalloutEndReason.Failed, "~r~Dispatch:~s~ call cancelled.");
             }
 
-            if (_suspects.Count == _incident.Suspects.Count) StartScene();
+            if (_suspects.Count == incident.Suspects.Count) StartScene();
             return null;
         }
 
         void AddSuspect(IPed ped, SuspectRoll roll, int index)
         {
-            SuspectPart part = _incident.Suspect;
+            SuspectPart part = _incident!.Suspect;
             SuspectProfile profile = _s.Profiles.Generate(ped.IsMale, part.Tags, part.Weapon != null);
             int seat = _vehicle != null ? index : -1;
             if (_vehicle != null) ped.WarpInto(_vehicle, seat);
             if (part.Weapon != null) ped.GiveWeapon(part.Weapon, equip: _vehicle == null);
             if (profile.ConcealedWeapon != null) ped.GiveWeapon(profile.ConcealedWeapon, equip: false);
-            _suspects.Add(new SceneSuspect(ped, profile, roll.Outcome.Behaviour, seat, _scope, _s));
+            var suspect = new SceneSuspect(ped, profile, roll.Outcome.Behaviour, seat, _scope, _s);
+            if (_vehicle != null && seat == 0)
+                suspect.Interaction.Vehicle = new VehicleRecordGenerator(_s.Profiles, _s.Random, _s.VehicleRecords)
+                    .Generate(_vehicle.Plate, _vehicle.Model, profile, part.Tags);
+            _suspects.Add(suspect);
         }
 
         void StartScene()
@@ -204,9 +245,7 @@ namespace Callsign.Core.Callouts
                     }
                     else if (_s.World.PlayerLightsOn)
                     {
-                        Driver.Ped.PullOver();
-                        Driver.ShowBlip("Suspect vehicle", MarkerColor.Red);
-                        Vehicle = VehicleStage.PullingOver;
+                        PullOver();
                     }
                     else if (_s.World.PlayerInVehicle)
                     {
@@ -215,10 +254,20 @@ namespace Callsign.Core.Callouts
                     return;
 
                 case VehicleStage.PullingOver:
-                    if (_vehicle.Speed > settings.StoppedSpeed && !_vehicle.IsWrecked) return;
+                    if (!_vehicle.IsWrecked)
+                    {
+                        // Stopped for a moment, not just slowing down on the way to the kerb.
+                        if (_vehicle.Speed > settings.StoppedSpeed) { _slowSince = -1; return; }
+                        if (_slowSince < 0) _slowSince = _s.Clock.NowMs;
+                        long slowFor = _s.Clock.NowMs - _slowSince;
+                        if (slowFor < (Driver.Ped.AtPullOverSpot ? settings.PulledOverMs : settings.PulledOverStuckMs)) return;
+                    }
                     Vehicle = VehicleStage.Stopped;
+                    Driver.Ped.WaitInVehicle();
                     _s.Notifier.Notify("The vehicle has ~g~stopped~s~. Approach the driver on foot.");
                     foreach (SceneSuspect x in Seated.ToList()) x.Engage();
+                    // Pulled over is stopped: the calm ones wait to be talked to, no need to stop them again.
+                    foreach (SceneSuspect x in _suspects.Where(x => x.Current == SceneSuspect.State.Calm)) x.Interaction.PulledOver();
                     return;
 
                 case VehicleStage.Pursuit:
@@ -245,6 +294,14 @@ namespace Callsign.Core.Callouts
                     else BailOut();
                     return;
             }
+        }
+
+        void PullOver()
+        {
+            _slowSince = -1;
+            Driver.Ped.PullOver();
+            Driver.ShowBlip("Suspect vehicle", MarkerColor.Red);
+            Vehicle = VehicleStage.PullingOver;
         }
 
         PursuitPressure Pressure(float distance) => new PursuitPressure(
@@ -331,6 +388,11 @@ namespace Callsign.Core.Callouts
             foreach (SceneSuspect x in _suspects)
                 if (x != _focus) Tick(x, default);
             if (_focus != null) Tick(_focus, input.ToInteraction());
+
+            // At a traffic stop the passengers aren't suspects: once the driver may go, calm ones go with them.
+            if (_incident == null && (Driver.Result == SuspectResult.Released || Driver.Result == SuspectResult.Cited))
+                foreach (SceneSuspect x in _suspects.Where(x => x.Current == SceneSuspect.State.Calm && !x.Interaction.Questioned))
+                    Finished(x, x.LeaveWithDriver);
         }
 
         void Tick(SceneSuspect suspect, InteractionInput input)
@@ -364,7 +426,7 @@ namespace Callsign.Core.Callouts
         {
             CalloutEndReason reason =
                 _suspects.Any(x => x.Result == SuspectResult.Arrested) ? CalloutEndReason.Arrested
-                : _suspects.Any(x => x.Result == SuspectResult.Released) ? CalloutEndReason.Resolved
+                : _suspects.Any(x => x.Result == SuspectResult.Released || x.Result == SuspectResult.Cited) ? CalloutEndReason.Resolved
                 : _suspects.Any(x => x.Result == SuspectResult.Died) ? CalloutEndReason.SuspectDied
                 : CalloutEndReason.SuspectEscaped;
             return End(reason, _lastFinished!.ResultMessage + " Code 4.");
@@ -384,6 +446,12 @@ namespace Callsign.Core.Callouts
             return reason;
         }
 
+        /// <summary>The interaction the player's keys go to, for dev tools.</summary>
+        internal SuspectInteraction? FocusInteraction => _focus?.Interaction;
+
+        /// <summary>How each suspect's part ended, for those that have.</summary>
+        internal IEnumerable<SuspectResult> Results => _suspects.Where(x => x.Result != null).Select(x => x.Result!.Value);
+
         /// <summary>Where the action is: the first suspect still in play, else the vehicle or the call's spot. For dev tools.</summary>
         internal Position Focus =>
             _suspects.FirstOrDefault(x => !x.IsDone && x.Ped.Exists)?.Ped.Position ?? _vehicle?.Position ?? _spot;
@@ -394,7 +462,7 @@ namespace Callsign.Core.Callouts
             Position player = _s.World.PlayerPosition;
             string suspects = string.Join(", ", _suspects.Select((x, i) =>
                 "#" + i + " " + x.Current + "/" + x.Behaviour + (x.Result != null ? "=" + x.Result : "")
-                + (x.Interaction.Stopped ? " stopped" : "") + (x.Interaction.MenuOpen ? " menu" : "")
+                + (x.Interaction.Stopped ? " [stopped]" : "") + (x.Interaction.MenuOpen ? " [menu]" : "")
                 + (x.Ped.Exists ? " " + x.Ped.Position.DistanceTo(player).ToString("0") + "m" : " gone")));
             return Current + (Vehicle != VehicleStage.None ? " vehicle=" + Vehicle : "")
                 + " spot=" + _spot.DistanceTo(player).ToString("0") + "m"
