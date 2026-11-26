@@ -1,0 +1,17 @@
+# A stolen car flees as soon as the player is close; cancelling cleans everything up.
+mark scenario vehicle-pursuit
+god on
+car police3
+duty on
+wait 500
+call stolen-vehicle
+accept
+expect callout=Active
+tp scene 40
+wait 4000
+expect vehicle=
+cancel
+wait 500
+expect scopes=0
+expect callout=Waiting
+duty off

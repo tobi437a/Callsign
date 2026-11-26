@@ -384,6 +384,23 @@ namespace Callsign.Core.Callouts
             return reason;
         }
 
+        /// <summary>Where the action is: the first suspect still in play, else the vehicle or the call's spot. For dev tools.</summary>
+        internal Position Focus =>
+            _suspects.FirstOrDefault(x => !x.IsDone && x.Ped.Exists)?.Ped.Position ?? _vehicle?.Position ?? _spot;
+
+        /// <summary>One line on the scene, for dev tools.</summary>
+        internal string Describe()
+        {
+            Position player = _s.World.PlayerPosition;
+            string suspects = string.Join(", ", _suspects.Select((x, i) =>
+                "#" + i + " " + x.Current + "/" + x.Behaviour + (x.Result != null ? "=" + x.Result : "")
+                + (x.Interaction.Stopped ? " stopped" : "") + (x.Interaction.MenuOpen ? " menu" : "")
+                + (x.Ped.Exists ? " " + x.Ped.Position.DistanceTo(player).ToString("0") + "m" : " gone")));
+            return Current + (Vehicle != VehicleStage.None ? " vehicle=" + Vehicle : "")
+                + " spot=" + _spot.DistanceTo(player).ToString("0") + "m"
+                + (suspects.Length > 0 ? " suspects: " + suspects : "");
+        }
+
         /// <summary>Releases everything the scene spawned. Safe to call more than once.</summary>
         public void Close(ReleaseMode mode)
         {

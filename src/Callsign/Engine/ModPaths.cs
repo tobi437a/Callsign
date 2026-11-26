@@ -14,6 +14,9 @@ namespace Callsign.Engine
         public string Data => Path.Combine(Home, "Data");
         public string LogFile => Path.Combine(Home, "Callsign.log");
 
+        /// <summary>Dev tools' command folder. Only deploy.ps1 creates it; the dev bridge runs only if it exists.</summary>
+        public string Dev => Path.Combine(Home, "Dev");
+
         ModPaths(string home) { Home = home; }
 
         public static ModPaths Detect()

@@ -79,10 +79,11 @@ namespace Callsign.Core.Callouts
         /// Offers a call right now instead of waiting for dispatch. Only while on duty and with no
         /// call offered or running. False if it couldn't (including when no incident fits here).
         /// </summary>
-        public bool RequestNow()
+        /// <param name="situationId">Only this situation (dev tools), or null for any.</param>
+        public bool RequestNow(string? situationId = null)
         {
             if (!_duty.OnDuty || Current == Phase.Offered || Current == Phase.Active) return false;
-            TryOffer();
+            TryOffer(situationId);
             if (Current == Phase.Offered) return true;
             _services.Notifier.Notify("~c~Dispatch:~s~ no calls in your area right now.");
             return false;
@@ -126,10 +127,18 @@ namespace Callsign.Core.Callouts
             Current = Phase.OffDuty;
         }
 
-        void TryOffer()
+        /// <summary>The running scene, for dev tools.</summary>
+        internal CalloutScene? Scene => _scene;
+
+        /// <summary>One line on the callout state, for dev tools.</summary>
+        internal string Describe() =>
+            Current + (Incident != null ? " " + Incident.Situation.Id + "@" + Incident.Location.Id : "")
+            + (_scene != null ? " | " + _scene.Describe() : "");
+
+        void TryOffer(string? situationId = null)
         {
             Position player = _services.World.PlayerPosition;
-            Incident? incident = _generator.Generate(player, Settings.MinDistance, Settings.MaxDistance, NearbyStreets(player));
+            Incident? incident = _generator.Generate(player, Settings.MinDistance, Settings.MaxDistance, NearbyStreets(player), situationId);
             if (incident == null)
             {
                 _nextOfferAt = _clock.NowMs + Settings.RetryMs;

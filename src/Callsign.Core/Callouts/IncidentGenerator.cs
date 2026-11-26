@@ -55,9 +55,10 @@ namespace Callsign.Core.Callouts
         /// <param name="minDistance">Locations closer than this are skipped (no call next to you).</param>
         /// <param name="maxDistance">Locations further than this are skipped.</param>
         /// <param name="extraLocations">One-off locations for this draw only (e.g. a street near the player).</param>
+        /// <param name="situationId">Only this situation (dev tools), or null for any.</param>
         /// <returns>Null when no combination fits.</returns>
         public Incident? Generate(Position player, float minDistance, float maxDistance,
-            IEnumerable<LocationPart>? extraLocations = null)
+            IEnumerable<LocationPart>? extraLocations = null, string? situationId = null)
         {
             var locations = _parts.Locations.All
                 .Concat(extraLocations ?? Enumerable.Empty<LocationPart>())
@@ -65,7 +66,8 @@ namespace Callsign.Core.Callouts
                 .ToList();
 
             var situations = _parts.Situations.All
-                .Where(s => locations.Any(l => s.Fits(l) && l.Weight > 0)
+                .Where(s => (situationId == null || s.Id == situationId)
+                            && locations.Any(l => s.Fits(l) && l.Weight > 0)
                             && _parts.Suspects.All.Any(p => s.Fits(p) && p.Models.Count > 0 && p.Weight > 0)
                             && _parts.Outcomes.All.Any(o => s.Fits(o) && o.Weight > 0))
                 .ToList();
